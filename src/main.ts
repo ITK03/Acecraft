@@ -9,7 +9,13 @@ import { CraftView } from './game/CraftView';
 import { BulletSystem } from './game/BulletSystem';
 import { MainGun } from './game/MainGun';
 import { EnemySystem } from './game/EnemySystem';
+import { DrainField } from './game/DrainField';
 import balance from './data/balance.json';
+
+// craft-敵弾の衝突判定用スクラッチ(毎フレームnewしない)。1ステップで同時に当たる弾は稀なので小さくてよい。
+const CRAFT_HIT_SCRATCH_SIZE = 16;
+const craftHitIsCharge = new Uint8Array(CRAFT_HIT_SCRATCH_SIZE);
+const craftHitIndex = new Int32Array(CRAFT_HIT_SCRATCH_SIZE);
 
 async function bootstrap(): Promise<void> {
   const host = document.getElementById('app');
@@ -64,6 +70,17 @@ async function bootstrap(): Promise<void> {
   });
   const enemySystem = new EnemySystem();
 
+  // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
+  const drainField = new DrainField({
+    radius: balance.drain.radius,
+    angleDeg: balance.drain.angleDeg,
+    pullSpeed: balance.drain.pullSpeed,
+    pullAccel: balance.drain.pullAccel,
+    absorbMargin: balance.drain.absorbMargin,
+    rampUpSeconds: balance.drain.rampUpSeconds,
+    chargeMax: balance.drain.chargeMax,
+  });
+
   // 描画順: 敵 -> 弾 -> 自機(弾が敵の下、自機が最前面に見えるように)
   world.addChild(enemySystem.view);
   world.addChild(bulletSystem.view);
@@ -116,14 +133,35 @@ async function bootstrap(): Promise<void> {
       const pointer = pointerInput.current;
       craft.update(dt, { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y });
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
+      // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
+      drainField.update(dt, craft, bulletSystem);
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
-      enemySystem.update(dt, bulletSystem);
+      enemySystem.update(dt, craft.x, craft.y, bulletSystem);
+
+      // ドレインに吸収されなかった敵弾(通常弾、またはDRAIN中でなかったチャージ弾)は
+      // 素通りせずクラフトに当たる。02_CORE_SPEC.md §3.1「チャージ弾のみが吸引対象」に対応。
+      let craftHitCount = 0;
+      bulletSystem.forEachActiveEnemyBullet((bullet, kind, index) => {
+        if (craftHitCount >= CRAFT_HIT_SCRATCH_SIZE) return;
+        const dx = bullet.x - craft.x;
+        const dy = bullet.y - craft.y;
+        const rSum = craft.hitRadius + bullet.radius;
+        if (dx * dx + dy * dy > rSum * rSum) return;
+        craftHitIsCharge[craftHitCount] = kind === 'enemyCharge' ? 1 : 0;
+        craftHitIndex[craftHitCount] = index;
+        craftHitCount += 1;
+      });
+      for (let i = 0; i < craftHitCount; i += 1) {
+        bulletSystem.consumeCraftHit(craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal', craftHitIndex[i]);
+      }
+
       stressTest.update(dt);
     },
     render: (_alpha) => {
       craftView.x = craft.x;
       craftView.y = craft.y;
       craftView.setState(craft.state);
+      craftView.setCharge(craft.charge, balance.drain.chargeMax);
 
       const rawFrameDelta = app.ticker.deltaMS / 1000;
       stressTest.reportFrame(rawFrameDelta);
@@ -132,6 +170,7 @@ async function bootstrap(): Promise<void> {
         activeBullets: bulletSystem.activeCount,
         activeEnemies: enemySystem.activeCount,
         craftState: craft.state,
+        craftCharge: craft.charge,
       });
     },
   });

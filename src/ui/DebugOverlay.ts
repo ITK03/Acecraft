@@ -11,6 +11,7 @@ export interface DebugStats {
   activeBullets: number;
   activeEnemies: number;
   craftState: string;
+  craftCharge: number;
 }
 
 export class DebugOverlay extends Container {
@@ -48,7 +49,7 @@ export class DebugOverlay extends Container {
       `sprites: ${stats.spriteCount}\n` +
       `bullets: ${stats.activeBullets}\n` +
       `enemies: ${stats.activeEnemies}\n` +
-      `craft: ${stats.craftState}`;
+      `craft: ${stats.craftState} (charge ${stats.craftCharge})`;
   }
 
   setVisible(visible: boolean): void {

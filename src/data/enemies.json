@@ -1,11 +1,19 @@
 {
-  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。T3時点では straightDown + wrapAround の1種のみ。fireScriptはT4で追加する。",
+  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。T3で移動、T4でfireScript(aimed/spread)を追加。",
   "grunt": {
     "hp": 25,
     "scoreXp": 4,
     "hitRadius": 22,
     "wrapAround": true,
     "fallSpeed": 220,
-    "contactDamage": 10
+    "contactDamage": 10,
+    "fireScript": {
+      "pattern": "spread",
+      "count": 3,
+      "spreadAngleDeg": 40,
+      "speed": 260,
+      "cooldown": 1.8,
+      "chargeableRate": 0.3
+    }
   }
 }

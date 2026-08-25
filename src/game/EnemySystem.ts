@@ -7,8 +7,8 @@ import enemyDefs from '../data/enemies.json';
 import balance from '../data/balance.json';
 
 /**
- * 敵システム(T3時点)。02_CORE_SPEC.md §5「敵とウェーブ」の最小サブセット。
- * moveScript は straightDown、fireScript は空(未射撃)のみを実装する。
+ * 敵システム。02_CORE_SPEC.md §5「敵とウェーブ」の最小サブセット。
+ * moveScript は straightDown、fireScript は aimed/spread の2パターンを実装する。
  * ウェーブ管理(スポーンのタイミング・構成)は T6 の WaveDirector が引き継ぐまでの
  * 暫定実装として、一定間隔で単一の敵種を降らせるだけの単純なスポーナーを内蔵する。
  */
@@ -18,6 +18,7 @@ interface Enemy extends Poolable {
   y: number;
   hp: number;
   maxHp: number;
+  fireCooldown: number;
 }
 
 interface EffectParticle extends Poolable {
@@ -34,7 +35,7 @@ const EFFECT_DURATION = 0.25; // 秒 [設計値]
 const def = enemyDefs.grunt;
 
 function makeEnemy(): Enemy {
-  return { active: false, x: 0, y: 0, hp: 0, maxHp: 0 };
+  return { active: false, x: 0, y: 0, hp: 0, maxHp: 0, fireCooldown: 0 };
 }
 function makeEffect(): EffectParticle {
   return { active: false, x: 0, y: 0, life: 0 };
@@ -94,9 +95,10 @@ export class EnemySystem {
     this.view.addChild(this.enemyLayer, this.effectLayer);
   }
 
-  update(dt: number, bulletSystem: BulletSystem): void {
+  update(dt: number, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
     this.updateSpawner(dt);
     this.moveEnemies(dt);
+    this.fireEnemies(dt, craftX, craftY, bulletSystem);
     this.rebuildGrid();
     this.resolvePlayerBulletHits(bulletSystem);
     this.updateEffects(dt);
@@ -114,6 +116,7 @@ export class EnemySystem {
     item.y = -GRID_MARGIN;
     item.hp = def.hp;
     item.maxHp = def.hp;
+    item.fireCooldown = Math.random() * def.fireScript.cooldown; // 出現タイミングを散らす
     this.graphics[index].visible = true;
   }
 
@@ -128,6 +131,35 @@ export class EnemySystem {
       g.x = enemy.x;
       g.y = enemy.y;
     });
+  }
+
+  /** 02_CORE_SPEC.md §5.3 の aimed/spread パターンを実装する */
+  private fireEnemies(dt: number, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
+    const fs = def.fireScript;
+    this.pool.forEachActive((enemy) => {
+      enemy.fireCooldown -= dt;
+      if (enemy.fireCooldown > 0) return;
+      enemy.fireCooldown += fs.cooldown;
+      this.fireAt(enemy.x, enemy.y, craftX, craftY, bulletSystem);
+    });
+  }
+
+  private fireAt(originX: number, originY: number, targetX: number, targetY: number, bulletSystem: BulletSystem): void {
+    const fs = def.fireScript;
+    const baseAngle = Math.atan2(targetY - originY, targetX - originX);
+    const spreadRad = (fs.spreadAngleDeg * Math.PI) / 180;
+
+    for (let i = 0; i < fs.count; i += 1) {
+      let angle = baseAngle;
+      if (fs.pattern === 'spread' && fs.count > 1) {
+        const t = i / (fs.count - 1) - 0.5; // -0.5..0.5
+        angle = baseAngle + t * spreadRad;
+      }
+      const vx = Math.cos(angle) * fs.speed;
+      const vy = Math.sin(angle) * fs.speed;
+      const chargeable = Math.random() < fs.chargeableRate;
+      bulletSystem.spawnEnemyBullet(chargeable ? 'enemyCharge' : 'enemyNormal', originX, originY, vx, vy, def.contactDamage);
+    }
   }
 
   private rebuildGrid(): void {

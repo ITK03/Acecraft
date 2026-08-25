@@ -14,6 +14,8 @@
     "radius": 260,
     "angleDeg": 55,
     "pullSpeed": 900,
+    "pullAccel": 3000,
+    "absorbMargin": 20,
     "rampUpSeconds": 0.08,
     "chargeMax": 30
   },

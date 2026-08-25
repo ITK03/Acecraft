@@ -144,11 +144,14 @@ export class BulletSystem {
       entry.particles[index].y = bullet.y;
     });
     for (let i = 0; i < releaseCount; i += 1) {
-      const index = entry.releaseScratch[i];
-      entry.particles[index].x = PARKED_X;
-      entry.particles[index].y = PARKED_Y;
-      entry.pool.release(index);
+      this.releaseIndex(entry, entry.releaseScratch[i]);
     }
+  }
+
+  private releaseIndex(entry: KindEntry, index: number): void {
+    entry.particles[index].x = PARKED_X;
+    entry.particles[index].y = PARKED_Y;
+    entry.pool.release(index);
   }
 
   /** 命中処理: pierce が尽きていれば解放、残っていれば減らすだけ */
@@ -156,16 +159,33 @@ export class BulletSystem {
     const entry = this.entries[kind];
     const bullet = entry.pool.get(index);
     if (bullet.pierce <= 0) {
-      entry.particles[index].x = PARKED_X;
-      entry.particles[index].y = PARKED_Y;
-      entry.pool.release(index);
+      this.releaseIndex(entry, index);
     } else {
       bullet.pierce -= 1;
     }
   }
 
+  /** ドレインに吸収された弾を完全に消滅させる(pierceを問わず即時消滅) */
+  absorbEnemyChargeBullet(index: number): void {
+    this.releaseIndex(this.entries.enemyCharge, index);
+  }
+
+  /** クラフトに命中した敵弾を消滅させる(T4時点ではHPシステム未実装のため見た目だけ消える) */
+  consumeCraftHit(kind: 'enemyNormal' | 'enemyCharge', index: number): void {
+    this.releaseIndex(this.entries[kind], index);
+  }
+
   forEachActivePlayerBullet(fn: (bullet: Bullet, index: number) => void): void {
     this.entries.player.pool.forEachActive(fn);
+  }
+
+  forEachActiveEnemyChargeBullet(fn: (bullet: Bullet, index: number) => void): void {
+    this.entries.enemyCharge.pool.forEachActive(fn);
+  }
+
+  forEachActiveEnemyBullet(fn: (bullet: Bullet, kind: 'enemyNormal' | 'enemyCharge', index: number) => void): void {
+    this.entries.enemyNormal.pool.forEachActive((bullet, index) => fn(bullet, 'enemyNormal', index));
+    this.entries.enemyCharge.pool.forEachActive((bullet, index) => fn(bullet, 'enemyCharge', index));
   }
 
   get activeCount(): number {

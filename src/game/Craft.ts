@@ -69,6 +69,10 @@ export class Craft {
   private counterElapsed = 0;
   private wasTouching = false;
 
+  get hitRadius(): number {
+    return this.config.hitRadius;
+  }
+
   constructor(config: CraftConfig, startX: number, startY: number) {
     this.config = config;
     this.x = startX;
