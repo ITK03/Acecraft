@@ -175,6 +175,28 @@ export class BulletSystem {
     this.releaseIndex(this.entries[kind], index);
   }
 
+  /**
+   * 画面内の敵弾(通常+チャージ)を全消去する。カウンター用(02_CORE_SPEC.md §3.4)。
+   * 高頻度に呼ばれる操作ではないため、消えた弾ごとに onEach(x,y) をコールバックする
+   * 設計にしている(呼び出し側はここで演出用の粒子を spawn する)。
+   */
+  clearAllEnemyBullets(onEach: (x: number, y: number) => void): number {
+    return this.clearKind(this.entries.enemyNormal, onEach) + this.clearKind(this.entries.enemyCharge, onEach);
+  }
+
+  private clearKind(entry: KindEntry, onEach: (x: number, y: number) => void): number {
+    let count = 0;
+    entry.pool.forEachActive((bullet, index) => {
+      onEach(bullet.x, bullet.y);
+      entry.releaseScratch[count] = index;
+      count += 1;
+    });
+    for (let i = 0; i < count; i += 1) {
+      this.releaseIndex(entry, entry.releaseScratch[i]);
+    }
+    return count;
+  }
+
   forEachActivePlayerBullet(fn: (bullet: Bullet, index: number) => void): void {
     this.entries.player.pool.forEachActive(fn);
   }

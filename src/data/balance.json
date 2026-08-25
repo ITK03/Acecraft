@@ -23,7 +23,10 @@
     "duration": 0.35,
     "clearThreshold": 10,
     "baseRatio": 3.0,
-    "scale": 0.08
+    "scale": 0.08,
+    "hitStopSeconds": 0.06,
+    "burstRadius": 320,
+    "particleFlightSeconds": 0.35
   },
   "ultimate": {
     "gaugeMax": 100,

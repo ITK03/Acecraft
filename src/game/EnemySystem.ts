@@ -162,6 +162,28 @@ export class EnemySystem {
     }
   }
 
+  /**
+   * カウンター発動時の範囲ダメージ(02_CORE_SPEC.md §3.4)。命中した敵の数を返す。
+   * onCounterFire は craft.update() の内部から同期的に発火するため、EnemySystem.update() の
+   * 通常の毎フレームグリッド更新より先に呼ばれることがある。呼び出し直前の敵位置を確実に
+   * 反映するため、ここで明示的にグリッドを再構築してから判定する。
+   */
+  applyCounterBurst(x: number, y: number, radius: number, damage: number): number {
+    this.rebuildGrid();
+    let hitCount = 0;
+    this.grid.forEachNear(x, y, radius, (enemyIndex) => {
+      const enemy = this.pool.get(enemyIndex);
+      if (!enemy.active) return;
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      if (dx * dx + dy * dy > radius * radius) return;
+      enemy.hp -= damage;
+      hitCount += 1;
+      if (enemy.hp <= 0) this.killEnemy(enemyIndex);
+    });
+    return hitCount;
+  }
+
   private rebuildGrid(): void {
     let count = 0;
     this.pool.forEachActive((enemy, index) => {

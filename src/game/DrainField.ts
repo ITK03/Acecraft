@@ -27,6 +27,9 @@ export class DrainField {
   private activeTime = 0;
   private wasActive = false;
 
+  /** T5: 弾を1発吸収するたびに呼ばれる。吸引音の再生などに使う */
+  onAbsorb?: (newCharge: number) => void;
+
   constructor(config: DrainFieldConfig) {
     this.config = config;
   }
@@ -51,6 +54,7 @@ export class DrainField {
       if (distSq <= absorbDistance * absorbDistance) {
         bulletSystem.absorbEnemyChargeBullet(index);
         craft.charge = Math.min(this.config.chargeMax, craft.charge + 1);
+        this.onAbsorb?.(craft.charge);
         return;
       }
 

@@ -10,6 +10,8 @@ import { BulletSystem } from './game/BulletSystem';
 import { MainGun } from './game/MainGun';
 import { EnemySystem } from './game/EnemySystem';
 import { DrainField } from './game/DrainField';
+import { ScoreParticles } from './game/ScoreParticles';
+import { AudioEngine } from './core/Audio';
 import balance from './data/balance.json';
 
 // craft-敵弾の衝突判定用スクラッチ(毎フレームnewしない)。1ステップで同時に当たる弾は稀なので小さくてよい。
@@ -81,10 +83,39 @@ async function bootstrap(): Promise<void> {
     chargeMax: balance.drain.chargeMax,
   });
 
-  // 描画順: 敵 -> 弾 -> 自機(弾が敵の下、自機が最前面に見えるように)
+  // T5: スコア粒子(カウンターで消えた弾の演出)と手続き的なSE。
+  const scoreParticles = new ScoreParticles(app.renderer, balance.bullets.maxActiveEnemyBullets, balance.counter.particleFlightSeconds);
+  const audioEngine = new AudioEngine();
+  // iOS Safari 対策: 最初のユーザー操作で必ず AudioContext を unlock する(04_TECH_STACK.md §3-4)。
+  app.canvas.addEventListener('pointerdown', () => audioEngine.unlock(), { once: true });
+
+  // ヒットストップと画面フラッシュの状態(カウンター発動で駆動)。
+  let hitStopRemaining = 0;
+  let flashAlpha = 0;
+  const screenFlash = new Graphics().rect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT).fill(0xffffff);
+  screenFlash.alpha = 0;
+
+  drainField.onAbsorb = (newCharge) => {
+    audioEngine.playDrainTick(newCharge, balance.drain.chargeMax);
+  };
+
+  craft.onCounterFire = (charge) => {
+    const damage = balance.player.atk * balance.counter.baseRatio * (1 + charge * balance.counter.scale);
+    if (charge >= balance.counter.clearThreshold) {
+      bulletSystem.clearAllEnemyBullets((x, y) => scoreParticles.spawn(x, y));
+    }
+    enemySystem.applyCounterBurst(craft.x, craft.y, balance.counter.burstRadius, damage);
+    hitStopRemaining = balance.counter.hitStopSeconds;
+    flashAlpha = 1;
+    audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
+  };
+
+  // 描画順: 敵 -> 弾 -> スコア粒子 -> 自機 -> 画面フラッシュ(弾が敵の下、自機が前面、フラッシュは最前面)
   world.addChild(enemySystem.view);
   world.addChild(bulletSystem.view);
+  world.addChild(scoreParticles.view);
   world.addChild(craftView);
+  world.addChild(screenFlash);
 
   // クライアント座標(画面ピクセル) -> 論理座標(720x1280) への変換。
   // world の位置・スケールは resize のたびに変わるため、呼び出し時点の値を毎回読む。
@@ -130,6 +161,12 @@ async function bootstrap(): Promise<void> {
 
   const loop = new FixedStepLoop({
     update: (dt) => {
+      // T5: ヒットストップ中は全システムの更新を止める(0.06秒の「画面が止まる」演出)。
+      if (hitStopRemaining > 0) {
+        hitStopRemaining -= dt;
+        return;
+      }
+
       const pointer = pointerInput.current;
       craft.update(dt, { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y });
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
@@ -155,6 +192,7 @@ async function bootstrap(): Promise<void> {
         bulletSystem.consumeCraftHit(craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal', craftHitIndex[i]);
       }
 
+      scoreParticles.update(dt, craft.x, craft.y);
       stressTest.update(dt);
     },
     render: (_alpha) => {
@@ -164,6 +202,10 @@ async function bootstrap(): Promise<void> {
       craftView.setCharge(craft.charge, balance.drain.chargeMax);
 
       const rawFrameDelta = app.ticker.deltaMS / 1000;
+      // フラッシュはヒットストップ中も含めて滑らかに減衰させたいので固定ステップではなく描画側で処理する。
+      flashAlpha = Math.max(0, flashAlpha - rawFrameDelta / 0.15);
+      screenFlash.alpha = flashAlpha * 0.5;
+
       stressTest.reportFrame(rawFrameDelta);
       debugOverlay.tick(rawFrameDelta, {
         spriteCount: app.stage.children.length,

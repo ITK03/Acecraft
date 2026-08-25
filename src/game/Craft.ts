@@ -69,6 +69,9 @@ export class Craft {
   private counterElapsed = 0;
   private wasTouching = false;
 
+  /** T5: DRAIN→COUNTER に遷移した瞬間に1回だけ呼ばれる。発動時の charge を渡す */
+  onCounterFire?: (charge: number) => void;
+
   get hitRadius(): number {
     return this.config.hitRadius;
   }
@@ -131,6 +134,7 @@ export class Craft {
         this.dragAnchorFingerY = input.fingerY;
         this.dragAnchorCraftX = this.x;
         this.dragAnchorCraftY = this.y;
+        this.onCounterFire?.(this.charge);
       } else {
         this.enterMove(input.fingerX, input.fingerY);
       }
