@@ -7,6 +7,14 @@
 export const LOGICAL_WIDTH = 720;
 export const LOGICAL_HEIGHT = 1280;
 
+/** 02_CORE_SPEC.md §1: プレイヤー移動可能範囲 */
+export const CRAFT_MOVE_BOUNDS = {
+  minX: 40,
+  maxX: 680,
+  minY: 300,
+  maxY: 1180,
+} as const;
+
 export interface ViewportSize {
   width: number;
   height: number;
