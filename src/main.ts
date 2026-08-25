@@ -43,9 +43,12 @@ async function bootstrap(): Promise<void> {
   world.addChild(bounds);
 
   // T1 弾幕ストレステスト(技術選定ゲート)。05_PHASE0_TASKS.md T1 参照。
-  // T2以降もそのまま並走させ、実機での継続的な負荷検証を兼ねる。
-  const stressTest = new StressTest(app.renderer);
-  world.addChild(stressTest.view);
+  // 常時1000発の永続弾を敷き詰めるため、通常プレイ画面に重ねると実弾が埋もれて
+  // 見えなくなる(T5確認時に発覚)。URL に ?stress=1 を付けた時だけ起動する専用モードとし、
+  // 通常プレイでは構築すらしない(視覚的なノイズだけでなく負荷もゼロにする)。
+  const stressTestEnabled = new URLSearchParams(window.location.search).get('stress') === '1';
+  const stressTest = stressTestEnabled ? new StressTest(app.renderer) : null;
+  if (stressTest) world.addChild(stressTest.view);
 
   // T2: 自機(クラフト)の状態機械と入力。02_CORE_SPEC.md §2 参照。
   const craft = new Craft(
@@ -133,7 +136,7 @@ async function bootstrap(): Promise<void> {
   const debugOverlay = new DebugOverlay();
   app.stage.addChild(debugOverlay);
   // stressTest.hudView は画面座標系(スケールされない)。DebugOverlay の下に重ならないよう配置する。
-  app.stage.addChild(stressTest.hudView);
+  if (stressTest) app.stage.addChild(stressTest.hudView);
 
   function applyViewport(): void {
     const { width, height, scale } = computeViewportSize();
@@ -193,7 +196,7 @@ async function bootstrap(): Promise<void> {
       }
 
       scoreParticles.update(dt, craft.x, craft.y);
-      stressTest.update(dt);
+      stressTest?.update(dt);
     },
     render: (_alpha) => {
       craftView.x = craft.x;
@@ -206,7 +209,7 @@ async function bootstrap(): Promise<void> {
       flashAlpha = Math.max(0, flashAlpha - rawFrameDelta / 0.15);
       screenFlash.alpha = flashAlpha * 0.5;
 
-      stressTest.reportFrame(rawFrameDelta);
+      stressTest?.reportFrame(rawFrameDelta);
       debugOverlay.tick(rawFrameDelta, {
         spriteCount: app.stage.children.length,
         activeBullets: bulletSystem.activeCount,
