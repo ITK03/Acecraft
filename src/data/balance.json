@@ -37,5 +37,13 @@
       "bossWave": 0.35,
       "hardWave": 0.2
     }
+  },
+  "player": {
+    "atk": 10
+  },
+  "devEnemySpawner": {
+    "_comment": "T6でWaveDirectorに置き換わるまでの暫定スポーナー設定(T3限定)",
+    "interval": 0.6,
+    "capacity": 40
   }
 }

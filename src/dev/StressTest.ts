@@ -2,7 +2,7 @@ import { Container, Particle, ParticleContainer, Text, TextStyle, type Renderer 
 import { Pool, type Poolable } from '../core/Pool';
 import { SpatialGrid } from '../core/SpatialGrid';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../core/Viewport';
-import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET } from './BulletTextures';
+import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET } from '../game/BulletTextures';
 
 /**
  * T1 弾幕ストレステスト(技術選定ゲート)。
@@ -106,7 +106,7 @@ export class StressTest {
       style: new TextStyle({ fill: '#ffe9a8', fontFamily: 'monospace', fontSize: 13, lineHeight: 17 }),
     });
     this.statsText.x = 8;
-    this.statsText.y = 96;
+    this.statsText.y = 114; // DebugOverlay が5行(8 + 5*18)になった分の余白
     this.hudView.addChild(this.statsText);
   }
 

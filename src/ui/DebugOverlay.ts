@@ -9,6 +9,7 @@ export interface DebugStats {
   fps: number;
   spriteCount: number;
   activeBullets: number;
+  activeEnemies: number;
   craftState: string;
 }
 
@@ -46,6 +47,7 @@ export class DebugOverlay extends Container {
       `fps: ${this.fpsDisplay}\n` +
       `sprites: ${stats.spriteCount}\n` +
       `bullets: ${stats.activeBullets}\n` +
+      `enemies: ${stats.activeEnemies}\n` +
       `craft: ${stats.craftState}`;
   }
 

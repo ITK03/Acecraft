@@ -1,0 +1,42 @@
+import type { CraftState } from './Craft';
+import type { BulletSystem } from './BulletSystem';
+
+/**
+ * 主砲の自動連射。02_CORE_SPEC.md §2.4「主砲(MOVE / COUNTER 中のみ発射)」。
+ * DRAIN 中はクールダウンを進めず、撃たない(貯めもしない: 再開時にいきなり連射されないよう
+ * クールダウンは DRAIN 中も維持したまま止めるだけ)。
+ */
+export interface MainGunConfig {
+  fireInterval: number;
+  bulletSpeed: number;
+  bulletCount: number;
+  damage: number;
+  /** 弾同士の左右オフセット(px)。[設計値] */
+  spread: number;
+}
+
+export class MainGun {
+  private readonly config: MainGunConfig;
+  private cooldown = 0;
+
+  constructor(config: MainGunConfig) {
+    this.config = config;
+  }
+
+  update(dt: number, craftState: CraftState, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
+    if (craftState === 'DRAIN') return; // 攻撃とドレインは排他(02_CORE_SPEC.md §2.1)
+
+    this.cooldown -= dt;
+    if (this.cooldown > 0) return;
+    this.cooldown += this.config.fireInterval;
+    this.fire(craftX, craftY, bulletSystem);
+  }
+
+  private fire(craftX: number, craftY: number, bulletSystem: BulletSystem): void {
+    const { bulletCount, spread, bulletSpeed, damage } = this.config;
+    for (let i = 0; i < bulletCount; i += 1) {
+      const offset = (i - (bulletCount - 1) / 2) * spread;
+      bulletSystem.spawnPlayerBullet(craftX + offset, craftY - 24, 0, -bulletSpeed, damage);
+    }
+  }
+}

@@ -6,6 +6,9 @@ import { DebugOverlay } from './ui/DebugOverlay';
 import { StressTest } from './dev/StressTest';
 import { Craft } from './game/Craft';
 import { CraftView } from './game/CraftView';
+import { BulletSystem } from './game/BulletSystem';
+import { MainGun } from './game/MainGun';
+import { EnemySystem } from './game/EnemySystem';
 import balance from './data/balance.json';
 
 async function bootstrap(): Promise<void> {
@@ -49,6 +52,21 @@ async function bootstrap(): Promise<void> {
     CRAFT_MOVE_BOUNDS.maxY - 80,
   );
   const craftView = new CraftView(balance.craft.hitRadius.normal);
+
+  // T3: 主砲・自弾・敵。02_CORE_SPEC.md §2.4/§4/§5 参照。
+  const bulletSystem = new BulletSystem(app.renderer);
+  const mainGun = new MainGun({
+    fireInterval: balance.mainGun.fireInterval,
+    bulletSpeed: balance.mainGun.bulletSpeed,
+    bulletCount: balance.mainGun.bulletCount,
+    damage: balance.player.atk,
+    spread: 14,
+  });
+  const enemySystem = new EnemySystem();
+
+  // 描画順: 敵 -> 弾 -> 自機(弾が敵の下、自機が最前面に見えるように)
+  world.addChild(enemySystem.view);
+  world.addChild(bulletSystem.view);
   world.addChild(craftView);
 
   // クライアント座標(画面ピクセル) -> 論理座標(720x1280) への変換。
@@ -97,6 +115,9 @@ async function bootstrap(): Promise<void> {
     update: (dt) => {
       const pointer = pointerInput.current;
       craft.update(dt, { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y });
+      mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
+      bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
+      enemySystem.update(dt, bulletSystem);
       stressTest.update(dt);
     },
     render: (_alpha) => {
@@ -108,7 +129,8 @@ async function bootstrap(): Promise<void> {
       stressTest.reportFrame(rawFrameDelta);
       debugOverlay.tick(rawFrameDelta, {
         spriteCount: app.stage.children.length,
-        activeBullets: stressTest.activeBulletCount,
+        activeBullets: bulletSystem.activeCount,
+        activeEnemies: enemySystem.activeCount,
         craftState: craft.state,
       });
     },
