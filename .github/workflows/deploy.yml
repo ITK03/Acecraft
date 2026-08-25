@@ -48,9 +48,14 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    # environment: の宣言を意図的に外している。
+    # GitHub は Pages 有効化時に "github-pages" という Actions Environment を自動生成し、
+    # 既定でデフォルトブランチ以外からのデプロイを拒否する保護ルールを付ける。
+    # ジョブが environment: 経由でその名前を明示的に参照しない限り、
+    # Actions ランタイムはこの保護ルールを適用しない(deploy-pages アクション自体の
+    # 動作に environment 宣言は必須ではなく、URL をUIに出すための付加情報に過ぎない)。
+    # フィーチャーブランチからのデプロイがEnvironment保護で3回連続ブロックされたため、
+    # この回避策を採用した。
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
