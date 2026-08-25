@@ -12,6 +12,7 @@ dist
 dist-ssr
 *.local
 *.tsbuildinfo
+scripts/headless-check.png
 
 # Editor directories and files
 .vscode/*

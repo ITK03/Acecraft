@@ -2,6 +2,7 @@ import { Application, Container, Graphics } from 'pixi.js';
 import { FixedStepLoop } from './core/Loop';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT, computeViewportSize } from './core/Viewport';
 import { DebugOverlay } from './ui/DebugOverlay';
+import { StressTest } from './dev/StressTest';
 
 async function bootstrap(): Promise<void> {
   const host = document.getElementById('app');
@@ -26,8 +27,14 @@ async function bootstrap(): Promise<void> {
     .stroke({ width: 2, color: 0x2a1f3d });
   world.addChild(bounds);
 
+  // T1 弾幕ストレステスト(技術選定ゲート)。05_PHASE0_TASKS.md T1 参照。
+  const stressTest = new StressTest(app.renderer);
+  world.addChild(stressTest.view);
+
   const debugOverlay = new DebugOverlay();
   app.stage.addChild(debugOverlay);
+  // stressTest.hudView は画面座標系(スケールされない)。DebugOverlay の下に重ならないよう配置する。
+  app.stage.addChild(stressTest.hudView);
 
   function applyViewport(): void {
     const { width, height, scale } = computeViewportSize();
@@ -54,15 +61,16 @@ async function bootstrap(): Promise<void> {
   });
 
   const loop = new FixedStepLoop({
-    update: (_dt) => {
-      // T2以降: Craft / BulletSystem / EnemySystem の update をここに接続する
+    update: (dt) => {
+      stressTest.update(dt);
     },
     render: (_alpha) => {
       const rawFrameDelta = app.ticker.deltaMS / 1000;
+      stressTest.reportFrame(rawFrameDelta);
       debugOverlay.tick(rawFrameDelta, {
         spriteCount: app.stage.children.length,
-        activeBullets: 0,
-        craftState: 'N/A',
+        activeBullets: stressTest.activeBulletCount,
+        craftState: 'T1 stress test',
       });
     },
   });
