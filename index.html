@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#0a0612" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <title>Acecraft Prototype</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background: #0a0612;
+        /* iOS Safari: ドラッグでのページスクロール/バウンドを抑止する */
+        overscroll-behavior: none;
+        overflow: hidden;
+        touch-action: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+      }
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        /* iOS Safari の URL バー変動対策で 100vh ではなく dvh を使う */
+        height: 100dvh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      canvas {
+        touch-action: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

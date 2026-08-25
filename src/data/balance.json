@@ -1,0 +1,41 @@
+{
+  "_comment": "02_CORE_SPEC.md の [設計値] を集約する。T2以降のタスクで随時値を追加する。",
+  "craft": {
+    "followLerp": 0.5,
+    "driftDamping": 0.85,
+    "hitRadius": { "casual": 8, "normal": 6, "ace": 5 }
+  },
+  "mainGun": {
+    "fireInterval": 0.12,
+    "bulletSpeed": 1400,
+    "bulletCount": 2
+  },
+  "drain": {
+    "radius": 260,
+    "angleDeg": 55,
+    "pullSpeed": 900,
+    "rampUpSeconds": 0.08,
+    "chargeMax": 30
+  },
+  "counter": {
+    "duration": 0.35,
+    "clearThreshold": 10,
+    "baseRatio": 3.0,
+    "scale": 0.08
+  },
+  "ultimate": {
+    "gaugeMax": 100,
+    "gaugePerCharge": 1,
+    "gaugePerHit": 0.15
+  },
+  "bullets": {
+    "poolSize": 1200,
+    "maxActiveEnemyBullets": 600,
+    "maxActivePlayerBullets": 400,
+    "chargeableRate": {
+      "normalWave": 0.3,
+      "bossWave": 0.35,
+      "hardWave": 0.2
+    }
+  }
+}
