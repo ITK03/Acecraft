@@ -15,8 +15,8 @@ import balance from '../data/balance.json';
  * どの種類を出すかはこのクラス内部でラウンドロビンに決める(WaveDirectorは敵の中身を知らない)。
  */
 
-type EnemyTypeId = 'grunt' | 'seeker';
-type MoveScript = 'straightDown' | 'sineDown';
+type EnemyTypeId = 'grunt' | 'seeker' | 'brawler';
+type MoveScript = 'straightDown' | 'sineDown' | 'chasePlayer';
 
 interface EnemyFireScript {
   pattern: 'aimed' | 'spread';
@@ -36,8 +36,14 @@ interface EnemyTypeDef {
   fallSpeed: number;
   sineAmplitude?: number;
   sineFrequency?: number;
+  /** chasePlayerのみ: 自機X座標へ毎秒どれだけ近づくか(0〜1に近いほど緩慢) */
+  chaseRate?: number;
+  /** 自機に直接触れた時のダメージ(02_CORE_SPEC.md §11「接触25」相当) */
   contactDamage: number;
-  fireScript: EnemyFireScript;
+  /** 省略可。brawlerのように弾を撃たず接触のみで戦う敵向け(ユーザーフィードバック「全員弾打ってくるだけ」対策) */
+  fireScript?: EnemyFireScript;
+  /** fireScriptがある場合の弾のダメージ(02_CORE_SPEC.md §11「雑魚弾12」相当)。contactDamageとは別物 */
+  bulletDamage?: number;
 }
 
 interface Enemy extends Poolable {
@@ -67,12 +73,13 @@ const HP_BAR_WIDTH = 28;
 const HP_BAR_HEIGHT = 4;
 
 const defs = enemyDefs as Record<EnemyTypeId, EnemyTypeDef>;
-const ENEMY_TYPE_IDS: readonly EnemyTypeId[] = ['grunt', 'seeker'];
-// waveでの出現比率(grunt 2 : seeker 1)。WaveDirectorは中身を知らないのでここで固定する。
-const SPAWN_CYCLE: readonly EnemyTypeId[] = ['grunt', 'grunt', 'seeker'];
-// マゼンタ/シアン(弾専用)と衝突しない緑・黄緑系でタイプごとに塗り分ける(T8 視認性ルール)。
-const ENEMY_COLORS: Record<EnemyTypeId, number> = { grunt: 0x6fbf6f, seeker: 0xbfbf5f };
+const ENEMY_TYPE_IDS: readonly EnemyTypeId[] = ['grunt', 'seeker', 'brawler'];
+// waveでの出現比率(grunt 2 : seeker 1 : brawler 1)。WaveDirectorは中身を知らないのでここで固定する。
+const SPAWN_CYCLE: readonly EnemyTypeId[] = ['grunt', 'grunt', 'seeker', 'brawler'];
+// マゼンタ/シアン(弾専用)と衝突しない緑・黄緑・錆色でタイプごとに塗り分ける(T8 視認性ルール)。
+const ENEMY_COLORS: Record<EnemyTypeId, number> = { grunt: 0x6fbf6f, seeker: 0xbfbf5f, brawler: 0x9f5a3f };
 const MAX_HIT_RADIUS = Math.max(...ENEMY_TYPE_IDS.map((id) => defs[id].hitRadius));
+const CONTACT_HIT_CAPACITY = 8;
 
 function makeEnemy(): Enemy {
   return { active: false, typeId: 'grunt', x: 0, y: 0, baseX: 0, age: 0, hp: 0, maxHp: 0, fireCooldown: 0 };
@@ -100,6 +107,8 @@ export class EnemySystem {
   private readonly hitBulletKindScratch: Uint8Array;
   private readonly hitEnemyScratch: Int32Array;
   private readonly hitDamageScratch: Float32Array;
+  // resolveContactWithCraft用の同種スクラッチ(接触した敵を先に集めてから走査後にkillEnemyする)
+  private readonly contactHitScratch = new Int32Array(CONTACT_HIT_CAPACITY);
 
   private readonly effectPool = new Pool<EffectParticle>(EFFECT_CAPACITY, makeEffect);
   private readonly effectGraphics: Graphics[] = [];
@@ -152,7 +161,7 @@ export class EnemySystem {
   }
 
   update(dt: number, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
-    this.moveEnemies(dt);
+    this.moveEnemies(dt, craftX);
     this.fireEnemies(dt, craftX, craftY, bulletSystem);
     this.rebuildGrid();
     this.resolvePlayerBulletHits(bulletSystem);
@@ -178,7 +187,7 @@ export class EnemySystem {
     item.age = 0;
     item.hp = def.hp;
     item.maxHp = def.hp;
-    item.fireCooldown = Math.random() * def.fireScript.cooldown; // 出現タイミングを散らす
+    item.fireCooldown = def.fireScript ? Math.random() * def.fireScript.cooldown : 0; // 出現タイミングを散らす
 
     this.graphics[index]
       .clear()
@@ -196,13 +205,16 @@ export class EnemySystem {
     return margin + Math.random() * span;
   }
 
-  private moveEnemies(dt: number): void {
+  private moveEnemies(dt: number, craftX: number): void {
     this.pool.forEachActive((enemy, index) => {
       const def = defs[enemy.typeId];
       enemy.age += dt;
       enemy.y += def.fallSpeed * dt;
       if (def.moveScript === 'sineDown') {
         enemy.x = enemy.baseX + Math.sin(enemy.age * (def.sineFrequency ?? 1)) * (def.sineAmplitude ?? 0);
+      } else if (def.moveScript === 'chasePlayer') {
+        // 02_CORE_SPEC.md §5.2「プレイヤーX座標に緩慢に追従しながら下降」。弾を撃たない近接タイプ用。
+        enemy.x += (craftX - enemy.x) * Math.min(1, (def.chaseRate ?? 1) * dt);
       }
       if (def.wrapAround && enemy.y > LOGICAL_HEIGHT + GRID_MARGIN) {
         enemy.y = -GRID_MARGIN;
@@ -242,15 +254,23 @@ export class EnemySystem {
   private fireEnemies(dt: number, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
     this.pool.forEachActive((enemy) => {
       const def = defs[enemy.typeId];
+      if (!def.fireScript) return; // brawlerのように弾を撃たない敵種
       enemy.fireCooldown -= dt;
       if (enemy.fireCooldown > 0) return;
       enemy.fireCooldown += def.fireScript.cooldown;
-      this.fireAt(def, enemy.x, enemy.y, craftX, craftY, bulletSystem);
+      this.fireAt(def.fireScript, def.bulletDamage ?? def.contactDamage, enemy.x, enemy.y, craftX, craftY, bulletSystem);
     });
   }
 
-  private fireAt(def: EnemyTypeDef, originX: number, originY: number, targetX: number, targetY: number, bulletSystem: BulletSystem): void {
-    const fs = def.fireScript;
+  private fireAt(
+    fs: EnemyFireScript,
+    damage: number,
+    originX: number,
+    originY: number,
+    targetX: number,
+    targetY: number,
+    bulletSystem: BulletSystem,
+  ): void {
     const baseAngle = Math.atan2(targetY - originY, targetX - originX);
     const spreadRad = ((fs.spreadAngleDeg ?? 60) * Math.PI) / 180;
 
@@ -263,7 +283,7 @@ export class EnemySystem {
       const vx = Math.cos(angle) * fs.speed;
       const vy = Math.sin(angle) * fs.speed;
       const chargeable = Math.random() < fs.chargeableRate;
-      bulletSystem.spawnEnemyBullet(chargeable ? 'enemyCharge' : 'enemyNormal', originX, originY, vx, vy, def.contactDamage);
+      bulletSystem.spawnEnemyBullet(chargeable ? 'enemyCharge' : 'enemyNormal', originX, originY, vx, vy, damage);
     }
   }
 
@@ -333,6 +353,31 @@ export class EnemySystem {
       enemy.hp -= this.hitDamageScratch[i];
       if (enemy.hp <= 0) this.killEnemy(enemyIndex);
     }
+  }
+
+  /**
+   * 自機と敵本体の接触ダメージ(02_CORE_SPEC.md §11「接触25」)。従来は弾同士の当たり判定しかなく
+   * 未実装だった。brawler(弾を撃たない近接タイプ)を機能させるために必須で追加した。
+   * 触れた敵は即座に撃破し(ラムアタック)、合計ダメージを返す。呼び出し側でplayerHealthに適用する。
+   */
+  resolveContactWithCraft(craftX: number, craftY: number, craftHitRadius: number): number {
+    let totalDamage = 0;
+    let hitCount = 0;
+    this.pool.forEachActive((enemy, index) => {
+      if (hitCount >= this.contactHitScratch.length) return;
+      const def = defs[enemy.typeId];
+      const dx = enemy.x - craftX;
+      const dy = enemy.y - craftY;
+      const rSum = craftHitRadius + def.hitRadius;
+      if (dx * dx + dy * dy > rSum * rSum) return;
+      this.contactHitScratch[hitCount] = index;
+      totalDamage += def.contactDamage;
+      hitCount += 1;
+    });
+    for (let i = 0; i < hitCount; i += 1) {
+      this.killEnemy(this.contactHitScratch[i]);
+    }
+    return totalDamage;
   }
 
   private killEnemy(index: number): void {

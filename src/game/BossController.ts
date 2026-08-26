@@ -38,6 +38,8 @@ interface BossDef {
   phaseStunSeconds: number;
   telegraphSeconds: number;
   moveSpeed: number;
+  /** 02_CORE_SPEC.md §11「ボス弾20」相当。以前はここに12がハードコードされていた */
+  bulletDamage: number;
   phases: PhaseDef[];
 }
 
@@ -154,7 +156,7 @@ export class BossController {
       const vx = Math.cos(angle) * p.speed;
       const vy = Math.sin(angle) * p.speed;
       const chargeable = Math.random() < p.chargeableRate;
-      bulletSystem.spawnEnemyBullet(chargeable ? 'enemyCharge' : 'enemyNormal', this.x, this.y, vx, vy, 12);
+      bulletSystem.spawnEnemyBullet(chargeable ? 'enemyCharge' : 'enemyNormal', this.x, this.y, vx, vy, def.bulletDamage);
     }
   }
 

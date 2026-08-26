@@ -1,24 +1,25 @@
 {
-  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。T3で移動、T4でfireScript(aimed/spread)を追加。ユーザーフィードバック(敵の行動がワンパターン)を受け、moveScript(02_CORE_SPEC.md §5.2)を追加し敵種を2種類にした。",
+  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。fireScriptは省略可(brawlerのように弾を撃たず接触のみで戦う敵向け)。bulletDamage(弾のダメージ)とcontactDamage(自機に直接ぶつかった時のダメージ)は02_CORE_SPEC.md §11の「雑魚弾12/ボス弾20/接触25」に準拠して分離した。ユーザーフィードバックを受け、HPを底上げし弾速を落とし、弾を撃たない近接タイプ(brawler, moveScript:chasePlayer)を追加した。",
   "grunt": {
-    "hp": 25,
+    "hp": 45,
     "scoreXp": 4,
     "hitRadius": 22,
     "wrapAround": true,
     "moveScript": "straightDown",
     "fallSpeed": 220,
-    "contactDamage": 10,
+    "contactDamage": 18,
     "fireScript": {
       "pattern": "spread",
       "count": 3,
       "spreadAngleDeg": 40,
-      "speed": 260,
+      "speed": 190,
       "cooldown": 1.8,
       "chargeableRate": 0.3
-    }
+    },
+    "bulletDamage": 12
   },
   "seeker": {
-    "hp": 16,
+    "hp": 30,
     "scoreXp": 5,
     "hitRadius": 20,
     "wrapAround": true,
@@ -26,13 +27,24 @@
     "fallSpeed": 170,
     "sineAmplitude": 90,
     "sineFrequency": 1.6,
-    "contactDamage": 10,
+    "contactDamage": 18,
     "fireScript": {
       "pattern": "aimed",
       "count": 1,
-      "speed": 300,
+      "speed": 220,
       "cooldown": 1.3,
       "chargeableRate": 0.3
-    }
+    },
+    "bulletDamage": 12
+  },
+  "brawler": {
+    "hp": 60,
+    "scoreXp": 6,
+    "hitRadius": 26,
+    "wrapAround": true,
+    "moveScript": "chasePlayer",
+    "fallSpeed": 260,
+    "chaseRate": 1.6,
+    "contactDamage": 25
   }
 }

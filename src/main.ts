@@ -89,6 +89,7 @@ async function bootstrap(): Promise<void> {
       hitRadius: balance.craft.hitRadius.normal,
       counterDuration: balance.counter.duration,
       bounds: CRAFT_MOVE_BOUNDS,
+      dragSensitivity: balance.craft.dragSensitivity,
     },
     CRAFT_SPAWN_X,
     CRAFT_SPAWN_Y,
@@ -277,31 +278,42 @@ async function bootstrap(): Promise<void> {
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       enemySystem.update(dt, craft.x, craft.y, bulletSystem);
 
-      // ドレインに吸収されなかった敵弾(通常弾、またはDRAIN中でなかったチャージ弾)は
-      // 素通りせずクラフトに当たる。02_CORE_SPEC.md §3.1「チャージ弾のみが吸引対象」に対応。
-      let craftHitCount = 0;
-      bulletSystem.forEachActiveEnemyBullet((bullet, kind, index) => {
-        if (craftHitCount >= CRAFT_HIT_SCRATCH_SIZE) return;
-        const dx = bullet.x - craft.x;
-        const dy = bullet.y - craft.y;
-        const rSum = craft.hitRadius + bullet.radius;
-        if (dx * dx + dy * dy > rSum * rSum) return;
-        craftHitIsCharge[craftHitCount] = kind === 'enemyCharge' ? 1 : 0;
-        craftHitIndex[craftHitCount] = index;
-        craftHitDamage[craftHitCount] = bullet.damage;
-        craftHitCount += 1;
-      });
-      for (let i = 0; i < craftHitCount; i += 1) {
-        const kind = craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal';
-        bulletSystem.consumeCraftHit(kind, craftHitIndex[i]);
+      // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
+      // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。
+      if (craft.state !== 'COUNTER') {
+        // ドレインに吸収されなかった敵弾(通常弾、またはDRAIN中でなかったチャージ弾)は
+        // 素通りせずクラフトに当たる。02_CORE_SPEC.md §3.1「チャージ弾のみが吸引対象」に対応。
+        let craftHitCount = 0;
+        bulletSystem.forEachActiveEnemyBullet((bullet, kind, index) => {
+          if (craftHitCount >= CRAFT_HIT_SCRATCH_SIZE) return;
+          const dx = bullet.x - craft.x;
+          const dy = bullet.y - craft.y;
+          const rSum = craft.hitRadius + bullet.radius;
+          if (dx * dx + dy * dy > rSum * rSum) return;
+          craftHitIsCharge[craftHitCount] = kind === 'enemyCharge' ? 1 : 0;
+          craftHitIndex[craftHitCount] = index;
+          craftHitDamage[craftHitCount] = bullet.damage;
+          craftHitCount += 1;
+        });
+        let totalCraftDamage = 0;
+        for (let i = 0; i < craftHitCount; i += 1) {
+          const kind = craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal';
+          bulletSystem.consumeCraftHit(kind, craftHitIndex[i]);
+          totalCraftDamage += craftHitDamage[i];
+        }
+        // 自機と敵本体が直接触れた場合のダメージ(02_CORE_SPEC.md §11「接触25」、これまで未実装だった)。
+        // ユーザーフィードバックで追加した近接タイプ(brawler)を機能させるために必須。
+        totalCraftDamage += enemySystem.resolveContactWithCraft(craft.x, craft.y, craft.hitRadius);
 
-        const result = playerHealth.takeDamage(craftHitDamage[i], balance.player.respawnInvincibleSeconds);
-        if (result === 'respawned') {
-          craft.respawnAt(CRAFT_SPAWN_X, CRAFT_SPAWN_Y, craftInput);
-        } else if (result === 'gameOver') {
-          waveDirector.failStage();
-          runEnded = true;
-          waveHud.showResult('failed');
+        if (totalCraftDamage > 0) {
+          const result = playerHealth.takeDamage(totalCraftDamage, balance.player.respawnInvincibleSeconds);
+          if (result === 'respawned') {
+            craft.respawnAt(CRAFT_SPAWN_X, CRAFT_SPAWN_Y, craftInput);
+          } else if (result === 'gameOver') {
+            waveDirector.failStage();
+            runEnded = true;
+            waveHud.showResult('failed');
+          }
         }
       }
 

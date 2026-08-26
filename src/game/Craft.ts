@@ -15,9 +15,11 @@
  * 移動の設計(02_CORE_SPEC.md §2.2):
  *   絶対追従(指の座標=機体座標)にはしない。指が機体を隠してしまうため。
  *   タッチ開始時点の「指と機体の位置関係(オフセット)」を保持し、
- *   指の移動量をそのままオフセット越しの目標地点(target)に反映したうえで、
+ *   指の移動量に dragSensitivity を掛けたものをオフセット越しの目標地点(target)に反映したうえで、
  *   機体は target へ followLerp で毎ステップ補間しながら追いつく(= 弾性のある追従)。
- *   これにより「指の移動量を1:1で反映する」ことと「追従を補間で滑らかにする」の両方を満たす。
+ *   dragSensitivity > 1 は「小さい指の動きで機体が大きく動く」ことを意味する。1.0のままだと
+ *   可動域全体を動かすのに指を同じ距離だけ動かす必要があり大変、というフィードバックを受けて追加した
+ *   (指が機体を隠さないという原則は保ったまま、体感の操作量だけを軽くする)。
  */
 
 export type CraftState = 'MOVE' | 'DRAIN' | 'COUNTER';
@@ -35,6 +37,8 @@ export interface CraftConfig {
   hitRadius: number;
   counterDuration: number;
   bounds: CraftBounds;
+  /** 指の移動量に掛ける倍率。1.0超で「小さい指の動きで大きく動ける」感度になる */
+  dragSensitivity: number;
 }
 
 export interface CraftInput {
@@ -90,8 +94,8 @@ export class Craft {
     const prevY = this.y;
 
     if (this.state === 'MOVE' || this.state === 'COUNTER') {
-      const targetX = this.dragAnchorCraftX + (input.fingerX - this.dragAnchorFingerX);
-      const targetY = this.dragAnchorCraftY + (input.fingerY - this.dragAnchorFingerY);
+      const targetX = this.dragAnchorCraftX + (input.fingerX - this.dragAnchorFingerX) * this.config.dragSensitivity;
+      const targetY = this.dragAnchorCraftY + (input.fingerY - this.dragAnchorFingerY) * this.config.dragSensitivity;
       this.x += (targetX - this.x) * this.config.followLerp;
       this.y += (targetY - this.y) * this.config.followLerp;
       this.clampToBounds();

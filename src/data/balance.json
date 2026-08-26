@@ -3,11 +3,13 @@
   "craft": {
     "followLerp": 0.5,
     "driftDamping": 0.85,
-    "hitRadius": { "casual": 8, "normal": 6, "ace": 5 }
+    "hitRadius": { "casual": 8, "normal": 6, "ace": 5 },
+    "_dragSensitivityComment": "ユーザーフィードバック「画面のどこ触っても自由に動かせるように、正確に持たないといけないの大変すぎる」。指の移動量に掛ける倍率。1.0だと指の動き=機体の移動量(絶対量)だが、それだと機体全可動域を動かすのに指を大きく動かす必要があり大変なので、指の動きより大きく機体が動くようにする。",
+    "dragSensitivity": 1.8
   },
   "mainGun": {
     "fireInterval": 0.12,
-    "bulletSpeed": 1400,
+    "bulletSpeed": 1100,
     "bulletCount": 2,
     "spread": 14
   },
@@ -29,11 +31,11 @@
     "hitStopSeconds": 0.06,
     "particleFlightSeconds": 0.35,
     "chargePerBullet": 3,
-    "bulletSpeed": 1800,
+    "bulletSpeed": 1200,
     "spreadDeg": 100,
-    "_homingComment": "ユーザーフィードバック「カウンター攻撃は若干敵を追尾するように」。速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。",
-    "homingTurnRateDeg": 150,
-    "homingSearchRadius": 450
+    "_homingComment": "ユーザーフィードバック「追尾弾と通常弾の違いがほとんどわからないし全然追尾してない」。弾速を落として画面に留まる時間を増やし、旋回速度も大幅に上げてはっきり曲がって見えるようにした。速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。",
+    "homingTurnRateDeg": 420,
+    "homingSearchRadius": 550
   },
   "ultimate": {
     "gaugeMax": 100,
