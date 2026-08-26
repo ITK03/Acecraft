@@ -7,7 +7,7 @@ import { StressTest } from './dev/StressTest';
 import { Craft } from './game/Craft';
 import { CraftView } from './game/CraftView';
 import { BulletSystem } from './game/BulletSystem';
-import { MainGun } from './game/MainGun';
+import { MainGun, type MainGunConfig } from './game/MainGun';
 import { EnemySystem } from './game/EnemySystem';
 import { DrainField } from './game/DrainField';
 import { ScoreParticles } from './game/ScoreParticles';
@@ -19,11 +19,25 @@ import { BossController } from './game/BossController';
 import { BossHud } from './ui/BossHud';
 import { Background } from './game/Background';
 import { BackgroundToggle } from './ui/BackgroundToggle';
+import { LootSystem } from './game/LootSystem';
+import { BuildSystem, type StatModifiers, type PickChoice } from './game/BuildSystem';
+import { LevelUpModal } from './ui/LevelUpModal';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
 const CRAFT_SPAWN_X = LOGICAL_WIDTH / 2;
 const CRAFT_SPAWN_Y = CRAFT_MOVE_BOUNDS.maxY - 80;
+
+/** balance.mainGun の基礎値に BuildSystem の装備補正(modifiers)を適用した実効値を作る */
+function computeMainGunConfig(modifiers: StatModifiers): MainGunConfig {
+  return {
+    fireInterval: balance.mainGun.fireInterval * modifiers.fireIntervalMultiplier,
+    bulletSpeed: balance.mainGun.bulletSpeed,
+    bulletCount: balance.mainGun.bulletCount + modifiers.bulletCountBonus,
+    damage: balance.player.atk * modifiers.atkMultiplier,
+    spread: balance.mainGun.spread + modifiers.spreadBonusDeg,
+  };
+}
 
 // craft-敵弾の衝突判定用スクラッチ(毎フレームnewしない)。1ステップで同時に当たる弾は稀なので小さくてよい。
 const CRAFT_HIT_SCRATCH_SIZE = 16;
@@ -96,15 +110,13 @@ async function bootstrap(): Promise<void> {
   );
   const craftView = new CraftView(balance.craft.hitRadius.normal);
 
+  // Phase 1: ローグライト(モジュール/チップ)。02_CORE_SPEC.md §7。装備が変わるたびに
+  // mainGun等の実効ステータスを再計算する(onModifiersChangedで配線する。定義は後段)。
+  const buildSystem = new BuildSystem();
+
   // T3: 主砲・自弾・敵。02_CORE_SPEC.md §2.4/§4/§5 参照。
   const bulletSystem = new BulletSystem(app.renderer);
-  const mainGun = new MainGun({
-    fireInterval: balance.mainGun.fireInterval,
-    bulletSpeed: balance.mainGun.bulletSpeed,
-    bulletCount: balance.mainGun.bulletCount,
-    damage: balance.player.atk,
-    spread: balance.mainGun.spread,
-  });
+  const mainGun = new MainGun(computeMainGunConfig(buildSystem.modifiers));
   const enemySystem = new EnemySystem();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
@@ -127,6 +139,28 @@ async function bootstrap(): Promise<void> {
   // iOS Safari 対策: 最初のユーザー操作で必ず AudioContext を unlock する(04_TECH_STACK.md §3-4)。
   app.canvas.addEventListener('pointerdown', () => audioEngine.unlock(), { once: true });
 
+  // Phase 1: 経験値・レベルアップ。02_CORE_SPEC.md §8。
+  const lootSystem = new LootSystem(
+    app.renderer,
+    { xpBase: balance.loot.xpBase, xpGrowthRate: balance.loot.xpGrowthRate, magnetFlightSeconds: balance.loot.magnetFlightSeconds },
+    balance.loot.capacity,
+  );
+  enemySystem.onKill = (x, y, scoreXp) => lootSystem.addXp(x, y, scoreXp);
+
+  const levelUpModal = new LevelUpModal();
+  // レベルアップ中はゲームを一時停止して3択UIを出す(02_CORE_SPEC.md §8)。nullでない間は
+  // ループのupdateを丸ごと止め、pointerdownのカードタップだけを受け付ける。
+  let pendingChoices: readonly PickChoice[] | null = null;
+  lootSystem.onLevelUp = (newLevel) => {
+    const choices = buildSystem.rollChoices(newLevel);
+    if (choices.length === 0) return; // 候補が尽きた(現状の実装済みモジュール/チップを取り切った)場合は何も出さない
+    pendingChoices = choices;
+    levelUpModal.show(choices);
+  };
+  buildSystem.onModifiersChanged = (modifiers) => {
+    mainGun.applyLoadout(computeMainGunConfig(modifiers));
+  };
+
   // ヒットストップと画面フラッシュの状態(カウンター発動で駆動)。
   let hitStopRemaining = 0;
   let flashAlpha = 0;
@@ -148,7 +182,7 @@ async function bootstrap(): Promise<void> {
   let runEnded = false;
 
   waveDirector.onWaveCleared = (healFraction) => {
-    playerHealth.heal(healFraction);
+    playerHealth.heal(healFraction * buildSystem.modifiers.healMultiplier);
   };
   waveDirector.onStageCleared = () => {
     bossController = new BossController();
@@ -168,7 +202,10 @@ async function bootstrap(): Promise<void> {
     // ユーザーフィードバックにより「吸収した弾を強力なカウンター弾として反射する」実装に変更。
     // 02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」。総ダメージは既存の式のまま、
     // それを chargePerBullet ごとに1発のカウンター弾へ分配して実際に飛ばし、命中判定させる。
-    const totalDamage = balance.player.atk * balance.counter.baseRatio * (1 + charge * balance.counter.scale);
+    // atkMultiplier(chip_barrel)とcounterDamageBonus(chip_capacitor)をBuildSystemから反映する。
+    const effectiveAtk = balance.player.atk * buildSystem.modifiers.atkMultiplier;
+    const totalDamage =
+      effectiveAtk * balance.counter.baseRatio * (1 + charge * balance.counter.scale) * (1 + buildSystem.modifiers.counterDamageBonus);
     const bulletCount = Math.max(1, Math.round(charge / balance.counter.chargePerBullet));
     const damagePerBullet = totalDamage / bulletCount;
     if (charge >= balance.counter.clearThreshold) {
@@ -202,15 +239,18 @@ async function bootstrap(): Promise<void> {
     return foundEnemy;
   };
 
-  // 描画順: 敵 -> 弾 -> スコア粒子 -> ドレイン範囲 -> 自機 -> 画面フラッシュ(自機が前面、フラッシュは最前面)
+  // 描画順: 敵 -> 弾 -> スコア粒子 -> XP粒子 -> ドレイン範囲 -> 自機 -> 画面フラッシュ ->
+  //         HUD -> レベルアップ3択(最前面、他の全てを覆う)
   world.addChild(enemySystem.view);
   world.addChild(bulletSystem.view);
   world.addChild(scoreParticles.view);
+  world.addChild(lootSystem.view);
   world.addChild(drainField.view);
   world.addChild(craftView);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
+  world.addChild(levelUpModal);
 
   // クライアント座標(画面ピクセル) -> 論理座標(720x1280) への変換。
   // world の位置・スケールは resize のたびに変わるため、呼び出し時点の値を毎回読む。
@@ -224,6 +264,17 @@ async function bootstrap(): Promise<void> {
     };
   };
   const pointerInput = new PointerInput(app.canvas as unknown as HTMLElement, toLogical);
+
+  // レベルアップの3択タップ判定。カードに当たれば装備を確定し、一時停止を解除する。
+  app.canvas.addEventListener('pointerdown', (e) => {
+    if (!pendingChoices) return;
+    const p = toLogical(e.clientX, e.clientY);
+    const index = levelUpModal.hitTest(p.x, p.y);
+    if (index === -1) return;
+    buildSystem.applyChoice(pendingChoices[index]);
+    pendingChoices = null;
+    levelUpModal.hide();
+  });
 
   const debugOverlay = new DebugOverlay();
   app.stage.addChild(debugOverlay);
@@ -265,6 +316,8 @@ async function bootstrap(): Promise<void> {
       }
       // T6/T7: ステージクリア/ゲームオーバー後は入力を止めてタップ待ちにする。
       if (runEnded) return;
+      // Phase 1: レベルアップ3択の選択待ち中はゲーム全体を一時停止する(02_CORE_SPEC.md §8)。
+      if (pendingChoices) return;
 
       const pointer = pointerInput.current;
       const craftInput = { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y };
@@ -304,6 +357,8 @@ async function bootstrap(): Promise<void> {
         // 自機と敵本体が直接触れた場合のダメージ(02_CORE_SPEC.md §11「接触25」、これまで未実装だった)。
         // ユーザーフィードバックで追加した近接タイプ(brawler)を機能させるために必須。
         totalCraftDamage += enemySystem.resolveContactWithCraft(craft.x, craft.y, craft.hitRadius);
+        // chip_plating(被ダメージ軽減)をここで一括して反映する。
+        totalCraftDamage *= buildSystem.modifiers.damageTakenMultiplier;
 
         if (totalCraftDamage > 0) {
           const result = playerHealth.takeDamage(totalCraftDamage, balance.player.respawnInvincibleSeconds);
@@ -323,6 +378,7 @@ async function bootstrap(): Promise<void> {
         bossController.resolvePlayerBulletHits(bulletSystem);
       }
       scoreParticles.update(dt, craft.x, craft.y);
+      lootSystem.update(dt, craft.x, craft.y);
       stressTest?.update(dt);
     },
     render: (_alpha) => {

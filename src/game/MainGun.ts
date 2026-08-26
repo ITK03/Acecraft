@@ -16,10 +16,17 @@ export interface MainGunConfig {
 }
 
 export class MainGun {
-  private readonly config: MainGunConfig;
+  // ローグライト(モジュール/チップ)で実行中に書き換わりうるため readonly にしない。
+  // 02_CORE_SPEC.md §7 mod_spread(弾数+spread)/chip_barrel(ATK%)/chip_gyro(攻撃速度%)向け。
+  private config: MainGunConfig;
   private cooldown = 0;
 
   constructor(config: MainGunConfig) {
+    this.config = config;
+  }
+
+  /** BuildSystem側の装備が変わった時に呼ぶ。次のfireCooldownから新しい値が反映される */
+  applyLoadout(config: MainGunConfig): void {
     this.config = config;
   }
 

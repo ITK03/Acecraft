@@ -117,6 +117,9 @@ export class EnemySystem {
   private readonly enemyLayer = new Container();
   private readonly effectLayer = new Container();
 
+  /** 敵を倒した(接触キル含む)瞬間に呼ばれる。02_CORE_SPEC.md §8 経験値ドロップ用 */
+  onKill?: (x: number, y: number, scoreXp: number) => void;
+
   constructor() {
     this.capacity = balance.enemySystem.capacity;
     this.pool = new Pool<Enemy>(this.capacity, makeEnemy);
@@ -382,7 +385,9 @@ export class EnemySystem {
 
   private killEnemy(index: number): void {
     const enemy = this.pool.get(index);
-    this.spawnEffect(enemy.x, enemy.y, defs[enemy.typeId].hitRadius);
+    const def = defs[enemy.typeId];
+    this.spawnEffect(enemy.x, enemy.y, def.hitRadius);
+    this.onKill?.(enemy.x, enemy.y, def.scoreXp);
     this.graphics[index].visible = false;
     this.hpBarGraphics[index].visible = false;
     this.pool.release(index);

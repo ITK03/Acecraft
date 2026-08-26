@@ -65,5 +65,12 @@
     "_comment": "05_PHASE0_TASKS.md T8。背景の上に常時のせる減光レイヤー。トグルONで演出停止+より濃く。",
     "dimAlpha": 0.28,
     "reducedDimAlpha": 0.45
+  },
+  "loot": {
+    "_comment": "02_CORE_SPEC.md §8。requiredXp(level) = round(xpBase * xpGrowthRate^level)。取得は撃破と同時に確定し、magnetFlightSecondsは自機へ飛んでいく演出だけの時間。",
+    "xpBase": 12,
+    "xpGrowthRate": 1.32,
+    "magnetFlightSeconds": 0.4,
+    "capacity": 60
   }
 }
