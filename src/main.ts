@@ -15,6 +15,8 @@ import { AudioEngine } from './core/Audio';
 import { PlayerHealth } from './game/PlayerHealth';
 import { WaveDirector, type StageDef } from './game/WaveDirector';
 import { WaveHud } from './ui/WaveHud';
+import { BossController } from './game/BossController';
+import { BossHud } from './ui/BossHud';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -84,15 +86,18 @@ async function bootstrap(): Promise<void> {
   const enemySystem = new EnemySystem();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
-  const drainField = new DrainField({
-    radius: balance.drain.radius,
-    angleDeg: balance.drain.angleDeg,
-    pullSpeed: balance.drain.pullSpeed,
-    pullAccel: balance.drain.pullAccel,
-    absorbMargin: balance.drain.absorbMargin,
-    rampUpSeconds: balance.drain.rampUpSeconds,
-    chargeMax: balance.drain.chargeMax,
-  });
+  const drainField = new DrainField(
+    {
+      radius: balance.drain.radius,
+      angleDeg: balance.drain.angleDeg,
+      pullSpeed: balance.drain.pullSpeed,
+      pullAccel: balance.drain.pullAccel,
+      absorbMargin: balance.drain.absorbMargin,
+      rampUpSeconds: balance.drain.rampUpSeconds,
+      chargeMax: balance.drain.chargeMax,
+    },
+    bulletSystem.enemyChargeCapacity,
+  );
 
   // T5: スコア粒子(カウンターで消えた弾の演出)と手続き的なSE。
   const scoreParticles = new ScoreParticles(app.renderer, balance.bullets.maxActiveEnemyBullets, balance.counter.particleFlightSeconds);
@@ -115,16 +120,26 @@ async function bootstrap(): Promise<void> {
   const waveDirector = new WaveDirector(stage1_1 as StageDef);
   const waveHud = new WaveHud();
 
+  // T7: ボス。全ウェーブクリア後にWaveDirectorから引き継ぐ。05_PHASE0_TASKS.md T7 参照。
+  const bossHud = new BossHud();
+  let bossController: BossController | null = null;
+  let runEnded = false;
+
   waveDirector.onWaveCleared = (healFraction) => {
     playerHealth.heal(healFraction);
   };
   waveDirector.onStageCleared = () => {
-    waveHud.showResult('cleared');
+    bossController = new BossController();
+    bossController.onDefeated = () => {
+      runEnded = true;
+      waveHud.showResult('cleared');
+    };
+    world.addChild(bossController.view);
   };
 
   // ステージクリア/ゲームオーバー後のタップでリトライ(状態リセットが複雑なため単純にリロードする)。
   app.canvas.addEventListener('pointerdown', () => {
-    if (waveDirector.status !== 'running') window.location.reload();
+    if (runEnded) window.location.reload();
   });
 
   craft.onCounterFire = (charge) => {
@@ -133,6 +148,7 @@ async function bootstrap(): Promise<void> {
       bulletSystem.clearAllEnemyBullets((x, y) => scoreParticles.spawn(x, y));
     }
     enemySystem.applyCounterBurst(craft.x, craft.y, balance.counter.burstRadius, damage);
+    bossController?.applyCounterBurst(craft.x, craft.y, balance.counter.burstRadius, damage, bulletSystem);
     hitStopRemaining = balance.counter.hitStopSeconds;
     flashAlpha = 1;
     audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
@@ -145,6 +161,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(craftView);
   world.addChild(screenFlash);
   world.addChild(waveHud);
+  world.addChild(bossHud);
 
   // クライアント座標(画面ピクセル) -> 論理座標(720x1280) への変換。
   // world の位置・スケールは resize のたびに変わるため、呼び出し時点の値を毎回読む。
@@ -195,8 +212,8 @@ async function bootstrap(): Promise<void> {
         hitStopRemaining -= dt;
         return;
       }
-      // T6: ステージクリア/ゲームオーバー後は入力を止めてタップ待ちにする。
-      if (waveDirector.status !== 'running') return;
+      // T6/T7: ステージクリア/ゲームオーバー後は入力を止めてタップ待ちにする。
+      if (runEnded) return;
 
       const pointer = pointerInput.current;
       const craftInput = { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y };
@@ -231,11 +248,16 @@ async function bootstrap(): Promise<void> {
           craft.respawnAt(CRAFT_SPAWN_X, CRAFT_SPAWN_Y, craftInput);
         } else if (result === 'gameOver') {
           waveDirector.failStage();
+          runEnded = true;
           waveHud.showResult('failed');
         }
       }
 
       waveDirector.update(dt, enemySystem);
+      if (bossController) {
+        bossController.update(dt, craft.x, craft.y, bulletSystem);
+        bossController.resolvePlayerBulletHits(bulletSystem, balance.player.atk);
+      }
       scoreParticles.update(dt, craft.x, craft.y);
       stressTest?.update(dt);
     },
@@ -245,6 +267,7 @@ async function bootstrap(): Promise<void> {
       craftView.setState(craft.state);
       craftView.setCharge(craft.charge, balance.drain.chargeMax);
       waveHud.update(waveDirector.currentWaveNumber, waveDirector.totalWaves, playerHealth.hp, playerHealth.maxHp, playerHealth.lives);
+      if (bossController) bossHud.update(bossController.hp / bossController.maxHp);
 
       const rawFrameDelta = app.ticker.deltaMS / 1000;
       // フラッシュはヒットストップ中も含めて滑らかに減衰させたいので固定ステップではなく描画側で処理する。

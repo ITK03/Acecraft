@@ -51,6 +51,12 @@ export class EnemySystem {
   private readonly gridScratchY: Float32Array;
   private readonly gridScratchKey: Int32Array;
 
+  // resolvePlayerBulletHits用: Pool.forEachActive の走査中に同じプールから release すると
+  // 密配列(スワップ削除)が壊れるため、命中した弾の添字を先に集めてから走査後にまとめて消費する。
+  private readonly hitBulletScratch: Int32Array;
+  private readonly hitEnemyScratch: Int32Array;
+  private readonly hitDamageScratch: Float32Array;
+
   private readonly effectPool = new Pool<EffectParticle>(EFFECT_CAPACITY, makeEffect);
   private readonly effectGraphics: Graphics[] = [];
 
@@ -73,6 +79,9 @@ export class EnemySystem {
     this.gridScratchX = new Float32Array(this.capacity);
     this.gridScratchY = new Float32Array(this.capacity);
     this.gridScratchKey = new Int32Array(this.capacity);
+    this.hitBulletScratch = new Int32Array(balance.bullets.maxActivePlayerBullets);
+    this.hitEnemyScratch = new Int32Array(balance.bullets.maxActivePlayerBullets);
+    this.hitDamageScratch = new Float32Array(balance.bullets.maxActivePlayerBullets);
 
     for (let i = 0; i < this.capacity; i += 1) {
       const g = new Graphics()
@@ -192,7 +201,13 @@ export class EnemySystem {
 
   private resolvePlayerBulletHits(bulletSystem: BulletSystem): void {
     const queryRadius = def.hitRadius + 24; // 24 = 自弾半径の上限を見込んだ余裕 [設計値]
+
+    // 先に「命中した(弾, 敵)の組」を集めるだけにとどめる。ここで consumeHit(release)してしまうと
+    // forEachActivePlayerBullet が内部で回している Pool の密配列(スワップ削除)を
+    // 走査中に壊してしまい、同フレームで1件取りこぼす恐れがある(Pool.ts の forEachActive 参照)。
+    let hitCount = 0;
     bulletSystem.forEachActivePlayerBullet((bullet, bulletIndex) => {
+      if (hitCount >= this.hitBulletScratch.length) return;
       let hitEnemyIndex = -1;
       this.grid.forEachNear(bullet.x, bullet.y, queryRadius, (enemyIndex) => {
         if (hitEnemyIndex !== -1) return; // 1発につき1体まで(貫通はpierceで別途対応)
@@ -203,12 +218,20 @@ export class EnemySystem {
         if (dx * dx + dy * dy <= rSum * rSum) hitEnemyIndex = enemyIndex;
       });
       if (hitEnemyIndex === -1) return;
-
-      const enemy = this.pool.get(hitEnemyIndex);
-      enemy.hp -= bullet.damage;
-      bulletSystem.consumeHit('player', bulletIndex);
-      if (enemy.hp <= 0) this.killEnemy(hitEnemyIndex);
+      this.hitBulletScratch[hitCount] = bulletIndex;
+      this.hitEnemyScratch[hitCount] = hitEnemyIndex;
+      this.hitDamageScratch[hitCount] = bullet.damage;
+      hitCount += 1;
     });
+
+    for (let i = 0; i < hitCount; i += 1) {
+      const enemyIndex = this.hitEnemyScratch[i];
+      const enemy = this.pool.get(enemyIndex);
+      bulletSystem.consumeHit('player', this.hitBulletScratch[i]);
+      if (!enemy.active) continue; // 同フレームで既に別弾に倒されている場合はスキップ
+      enemy.hp -= this.hitDamageScratch[i];
+      if (enemy.hp <= 0) this.killEnemy(enemyIndex);
+    }
   }
 
   private killEnemy(index: number): void {

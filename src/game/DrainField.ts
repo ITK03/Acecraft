@@ -27,11 +27,16 @@ export class DrainField {
   private activeTime = 0;
   private wasActive = false;
 
+  // update()内でPool.forEachActiveを回している最中に release すると密配列(スワップ削除)が
+  // 壊れるため、吸収対象の添字を先に集めてから走査後にまとめて absorb する。
+  private readonly absorbScratch: Int32Array;
+
   /** T5: 弾を1発吸収するたびに呼ばれる。吸引音の再生などに使う */
   onAbsorb?: (newCharge: number) => void;
 
-  constructor(config: DrainFieldConfig) {
+  constructor(config: DrainFieldConfig, enemyChargeCapacity: number) {
     this.config = config;
+    this.absorbScratch = new Int32Array(enemyChargeCapacity);
   }
 
   /** 固定ステップで呼ぶ。bulletSystem.update() より前に呼ぶこと(このフレームの移動に反映させるため) */
@@ -46,15 +51,17 @@ export class DrainField {
     const angleRad = (this.config.angleDeg * Math.PI) / 180;
     const absorbDistance = craft.hitRadius + this.config.absorbMargin;
 
+    let absorbCount = 0;
     bulletSystem.forEachActiveEnemyChargeBullet((bullet, index) => {
       const dx = bullet.x - craft.x;
       const dy = bullet.y - craft.y;
       const distSq = dx * dx + dy * dy;
 
       if (distSq <= absorbDistance * absorbDistance) {
-        bulletSystem.absorbEnemyChargeBullet(index);
-        craft.charge = Math.min(this.config.chargeMax, craft.charge + 1);
-        this.onAbsorb?.(craft.charge);
+        if (absorbCount < this.absorbScratch.length) {
+          this.absorbScratch[absorbCount] = index;
+          absorbCount += 1;
+        }
         return;
       }
 
@@ -74,5 +81,11 @@ export class DrainField {
       bullet.vx = dirX * nextSpeed;
       bullet.vy = dirY * nextSpeed;
     });
+
+    for (let i = 0; i < absorbCount; i += 1) {
+      bulletSystem.absorbEnemyChargeBullet(this.absorbScratch[i]);
+      craft.charge = Math.min(this.config.chargeMax, craft.charge + 1);
+      this.onAbsorb?.(craft.charge);
+    }
   }
 }

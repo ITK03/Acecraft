@@ -213,4 +213,9 @@ export class BulletSystem {
   get activeCount(): number {
     return this.entries.enemyNormal.pool.activeCount + this.entries.enemyCharge.pool.activeCount + this.entries.player.pool.activeCount;
   }
+
+  /** チャージ弾プールの総容量。呼び出し側(DrainFieldの吸収スクラッチ等)のサイズ決めに使う */
+  get enemyChargeCapacity(): number {
+    return this.entries.enemyCharge.pool.capacity;
+  }
 }

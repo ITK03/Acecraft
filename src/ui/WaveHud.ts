@@ -34,7 +34,9 @@ export class WaveHud extends Container {
   }
 
   update(waveNumber: number, totalWaves: number, hp: number, maxHp: number, lives: number): void {
-    this.statusText.text = `WAVE ${waveNumber}/${totalWaves}\nHP ${Math.max(0, Math.round(hp))}/${maxHp}\nLIVES ${lives}`;
+    // 全ウェーブクリア後(ボス戦中)は waveNumber が totalWaves を超えうるので表示上は頭打ちにする
+    const displayWave = Math.min(waveNumber, totalWaves);
+    this.statusText.text = `WAVE ${displayWave}/${totalWaves}\nHP ${Math.max(0, Math.round(hp))}/${maxHp}\nLIVES ${lives}`;
   }
 
   showResult(status: 'cleared' | 'failed'): void {

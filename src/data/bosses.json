@@ -1,0 +1,32 @@
+{
+  "_comment": "02_CORE_SPEC.md §6 BossDef。T7時点ではsentinel1種のみ。フェーズごとに小技+大技(チャージ弾多め)を持つ。",
+  "sentinel": {
+    "hpBars": 3,
+    "hpPerBar": 220,
+    "hitRadius": 64,
+    "entryCutsceneSeconds": 2.0,
+    "phaseStunSeconds": 0.5,
+    "telegraphSeconds": 1.0,
+    "moveSpeed": 70,
+    "phases": [
+      {
+        "pattern": { "type": "ring", "count": 12, "speed": 200, "chargeableRate": 0.25 },
+        "patternCooldown": 1.6,
+        "bigAttack": { "type": "spread", "count": 9, "spreadAngleDeg": 110, "speed": 240, "chargeableRate": 0.6 },
+        "bigAttackInterval": 5.0
+      },
+      {
+        "pattern": { "type": "ring", "count": 16, "speed": 230, "chargeableRate": 0.3 },
+        "patternCooldown": 1.3,
+        "bigAttack": { "type": "spread", "count": 12, "spreadAngleDeg": 130, "speed": 260, "chargeableRate": 0.65 },
+        "bigAttackInterval": 4.3
+      },
+      {
+        "pattern": { "type": "ring", "count": 20, "speed": 260, "chargeableRate": 0.35 },
+        "patternCooldown": 1.0,
+        "bigAttack": { "type": "spread", "count": 16, "spreadAngleDeg": 150, "speed": 280, "chargeableRate": 0.7 },
+        "bigAttackInterval": 3.6
+      }
+    ]
+  }
+}
