@@ -9,8 +9,8 @@ import balance from '../data/balance.json';
 /**
  * 敵システム。02_CORE_SPEC.md §5「敵とウェーブ」の最小サブセット。
  * moveScript は straightDown、fireScript は aimed/spread の2パターンを実装する。
- * ウェーブ管理(スポーンのタイミング・構成)は T6 の WaveDirector が引き継ぐまでの
- * 暫定実装として、一定間隔で単一の敵種を降らせるだけの単純なスポーナーを内蔵する。
+ * スポーンのタイミング・構成(いつ・何体)は WaveDirector が管理し、
+ * このクラスは trySpawnGrunt() を叩かれたら1体出す、という受動的な役割に徹する。
  */
 
 interface Enemy extends Poolable {
@@ -58,10 +58,8 @@ export class EnemySystem {
   private readonly enemyLayer = new Container();
   private readonly effectLayer = new Container();
 
-  private spawnTimer = 0;
-
   constructor() {
-    this.capacity = balance.devEnemySpawner.capacity;
+    this.capacity = balance.enemySystem.capacity;
     this.pool = new Pool<Enemy>(this.capacity, makeEnemy);
 
     this.grid = new SpatialGrid(
@@ -96,7 +94,6 @@ export class EnemySystem {
   }
 
   update(dt: number, craftX: number, craftY: number, bulletSystem: BulletSystem): void {
-    this.updateSpawner(dt);
     this.moveEnemies(dt);
     this.fireEnemies(dt, craftX, craftY, bulletSystem);
     this.rebuildGrid();
@@ -104,13 +101,10 @@ export class EnemySystem {
     this.updateEffects(dt);
   }
 
-  private updateSpawner(dt: number): void {
-    this.spawnTimer -= dt;
-    if (this.spawnTimer > 0) return;
-    this.spawnTimer += balance.devEnemySpawner.interval;
-
+  /** WaveDirector から呼ばれる。1体出現させ、成功したかを返す(容量上限なら false) */
+  trySpawnGrunt(): boolean {
     const acquired = this.pool.acquire();
-    if (!acquired) return; // 上限到達。T9で容量を実測調整する
+    if (!acquired) return false; // 上限到達。T9で容量を実測調整する
     const { index, item } = acquired;
     item.x = 40 + Math.random() * (LOGICAL_WIDTH - 80);
     item.y = -GRID_MARGIN;
@@ -118,6 +112,7 @@ export class EnemySystem {
     item.maxHp = def.hp;
     item.fireCooldown = Math.random() * def.fireScript.cooldown; // 出現タイミングを散らす
     this.graphics[index].visible = true;
+    return true;
   }
 
   private moveEnemies(dt: number): void {

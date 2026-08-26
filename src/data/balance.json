@@ -44,11 +44,12 @@
     }
   },
   "player": {
-    "atk": 10
+    "atk": 10,
+    "maxHp": 100,
+    "lives": 3,
+    "respawnInvincibleSeconds": 1.5
   },
-  "devEnemySpawner": {
-    "_comment": "T6でWaveDirectorに置き換わるまでの暫定スポーナー設定(T3限定)",
-    "interval": 0.6,
+  "enemySystem": {
     "capacity": 40
   }
 }

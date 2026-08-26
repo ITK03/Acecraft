@@ -1,0 +1,16 @@
+{
+  "_comment": "02_CORE_SPEC.md §5.5 StageDef の最小版。T6時点では敵種がgruntの1種類のみ。ボスはT7で追加。",
+  "id": "1-1",
+  "waves": [
+    { "enemyCount": 4, "spawnInterval": 0.8, "postWaveHeal": 0.05 },
+    { "enemyCount": 5, "spawnInterval": 0.8, "postWaveHeal": 0.05 },
+    { "enemyCount": 5, "spawnInterval": 0.7, "postWaveHeal": 0.05 },
+    { "enemyCount": 6, "spawnInterval": 0.7, "postWaveHeal": 0.05 },
+    { "enemyCount": 6, "spawnInterval": 0.6, "postWaveHeal": 0.05 },
+    { "enemyCount": 7, "spawnInterval": 0.6, "postWaveHeal": 0.05 },
+    { "enemyCount": 7, "spawnInterval": 0.55, "postWaveHeal": 0.05 },
+    { "enemyCount": 8, "spawnInterval": 0.5, "postWaveHeal": 0.05 },
+    { "enemyCount": 8, "spawnInterval": 0.45, "postWaveHeal": 0.1 },
+    { "enemyCount": 10, "spawnInterval": 0.4, "postWaveHeal": 0.2 }
+  ]
+}

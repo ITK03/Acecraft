@@ -145,6 +145,28 @@ export class Craft {
     // (update() 内の counterElapsed 判定で input.isTouching を見て事後処理する)
   }
 
+  /**
+   * T6: 撃墜からの復帰。指の状態を明示的に渡し、通常のエッジ検出(touchStarted等)を
+   * バイパスして即座に正しい状態(MOVE/DRAIN)へ入る。指が押されたまま死亡復帰した場合、
+   * 通常のエッジ検出だと「新規タッチ」と認識されず MOVE に入れなくなるため。
+   */
+  respawnAt(x: number, y: number, input: CraftInput): void {
+    this.x = x;
+    this.y = y;
+    this.charge = 0;
+    this.vx = 0;
+    this.vy = 0;
+    this.trackedVx = 0;
+    this.trackedVy = 0;
+    this.counterElapsed = 0;
+    if (input.isTouching) {
+      this.enterMove(input.fingerX, input.fingerY);
+    } else {
+      this.state = 'DRAIN';
+    }
+    this.wasTouching = input.isTouching;
+  }
+
   private enterMove(fingerX: number, fingerY: number): void {
     this.state = 'MOVE';
     this.dragAnchorFingerX = fingerX;

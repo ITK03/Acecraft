@@ -12,12 +12,20 @@ import { EnemySystem } from './game/EnemySystem';
 import { DrainField } from './game/DrainField';
 import { ScoreParticles } from './game/ScoreParticles';
 import { AudioEngine } from './core/Audio';
+import { PlayerHealth } from './game/PlayerHealth';
+import { WaveDirector, type StageDef } from './game/WaveDirector';
+import { WaveHud } from './ui/WaveHud';
 import balance from './data/balance.json';
+import stage1_1 from './data/stages/1-1.json';
+
+const CRAFT_SPAWN_X = LOGICAL_WIDTH / 2;
+const CRAFT_SPAWN_Y = CRAFT_MOVE_BOUNDS.maxY - 80;
 
 // craft-敵弾の衝突判定用スクラッチ(毎フレームnewしない)。1ステップで同時に当たる弾は稀なので小さくてよい。
 const CRAFT_HIT_SCRATCH_SIZE = 16;
 const craftHitIsCharge = new Uint8Array(CRAFT_HIT_SCRATCH_SIZE);
 const craftHitIndex = new Int32Array(CRAFT_HIT_SCRATCH_SIZE);
+const craftHitDamage = new Float32Array(CRAFT_HIT_SCRATCH_SIZE);
 
 async function bootstrap(): Promise<void> {
   const host = document.getElementById('app');
@@ -59,8 +67,8 @@ async function bootstrap(): Promise<void> {
       counterDuration: balance.counter.duration,
       bounds: CRAFT_MOVE_BOUNDS,
     },
-    LOGICAL_WIDTH / 2,
-    CRAFT_MOVE_BOUNDS.maxY - 80,
+    CRAFT_SPAWN_X,
+    CRAFT_SPAWN_Y,
   );
   const craftView = new CraftView(balance.craft.hitRadius.normal);
 
@@ -102,6 +110,23 @@ async function bootstrap(): Promise<void> {
     audioEngine.playDrainTick(newCharge, balance.drain.chargeMax);
   };
 
+  // T6: HP・残機・ウェーブ進行。05_PHASE0_TASKS.md T6 参照。
+  const playerHealth = new PlayerHealth(balance.player.maxHp, balance.player.lives);
+  const waveDirector = new WaveDirector(stage1_1 as StageDef);
+  const waveHud = new WaveHud();
+
+  waveDirector.onWaveCleared = (healFraction) => {
+    playerHealth.heal(healFraction);
+  };
+  waveDirector.onStageCleared = () => {
+    waveHud.showResult('cleared');
+  };
+
+  // ステージクリア/ゲームオーバー後のタップでリトライ(状態リセットが複雑なため単純にリロードする)。
+  app.canvas.addEventListener('pointerdown', () => {
+    if (waveDirector.status !== 'running') window.location.reload();
+  });
+
   craft.onCounterFire = (charge) => {
     const damage = balance.player.atk * balance.counter.baseRatio * (1 + charge * balance.counter.scale);
     if (charge >= balance.counter.clearThreshold) {
@@ -119,6 +144,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(scoreParticles.view);
   world.addChild(craftView);
   world.addChild(screenFlash);
+  world.addChild(waveHud);
 
   // クライアント座標(画面ピクセル) -> 論理座標(720x1280) への変換。
   // world の位置・スケールは resize のたびに変わるため、呼び出し時点の値を毎回読む。
@@ -169,9 +195,13 @@ async function bootstrap(): Promise<void> {
         hitStopRemaining -= dt;
         return;
       }
+      // T6: ステージクリア/ゲームオーバー後は入力を止めてタップ待ちにする。
+      if (waveDirector.status !== 'running') return;
 
       const pointer = pointerInput.current;
-      craft.update(dt, { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y });
+      const craftInput = { isTouching: pointer.isDown, fingerX: pointer.x, fingerY: pointer.y };
+      craft.update(dt, craftInput);
+      playerHealth.update(dt);
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
       drainField.update(dt, craft, bulletSystem);
@@ -189,12 +219,23 @@ async function bootstrap(): Promise<void> {
         if (dx * dx + dy * dy > rSum * rSum) return;
         craftHitIsCharge[craftHitCount] = kind === 'enemyCharge' ? 1 : 0;
         craftHitIndex[craftHitCount] = index;
+        craftHitDamage[craftHitCount] = bullet.damage;
         craftHitCount += 1;
       });
       for (let i = 0; i < craftHitCount; i += 1) {
-        bulletSystem.consumeCraftHit(craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal', craftHitIndex[i]);
+        const kind = craftHitIsCharge[i] === 1 ? 'enemyCharge' : 'enemyNormal';
+        bulletSystem.consumeCraftHit(kind, craftHitIndex[i]);
+
+        const result = playerHealth.takeDamage(craftHitDamage[i], balance.player.respawnInvincibleSeconds);
+        if (result === 'respawned') {
+          craft.respawnAt(CRAFT_SPAWN_X, CRAFT_SPAWN_Y, craftInput);
+        } else if (result === 'gameOver') {
+          waveDirector.failStage();
+          waveHud.showResult('failed');
+        }
       }
 
+      waveDirector.update(dt, enemySystem);
       scoreParticles.update(dt, craft.x, craft.y);
       stressTest?.update(dt);
     },
@@ -203,6 +244,7 @@ async function bootstrap(): Promise<void> {
       craftView.y = craft.y;
       craftView.setState(craft.state);
       craftView.setCharge(craft.charge, balance.drain.chargeMax);
+      waveHud.update(waveDirector.currentWaveNumber, waveDirector.totalWaves, playerHealth.hp, playerHealth.maxHp, playerHealth.lives);
 
       const rawFrameDelta = app.ticker.deltaMS / 1000;
       // フラッシュはヒットストップ中も含めて滑らかに減衰させたいので固定ステップではなく描画側で処理する。
