@@ -54,7 +54,7 @@ interface KindEntry {
 }
 
 function enemyChargeCapacity(): number {
-  return Math.round(balance.bullets.maxActiveEnemyBullets * balance.bullets.chargeableRate.normalWave);
+  return Math.round(balance.bullets.maxActiveEnemyBullets * balance.bullets.chargeCapacityRatio);
 }
 function enemyNormalCapacity(): number {
   return balance.bullets.maxActiveEnemyBullets - enemyChargeCapacity();

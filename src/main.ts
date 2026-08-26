@@ -17,6 +17,8 @@ import { WaveDirector, type StageDef } from './game/WaveDirector';
 import { WaveHud } from './ui/WaveHud';
 import { BossController } from './game/BossController';
 import { BossHud } from './ui/BossHud';
+import { Background } from './game/Background';
+import { BackgroundToggle } from './ui/BackgroundToggle';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -45,6 +47,20 @@ async function bootstrap(): Promise<void> {
   // 論理解像度 720x1280 の世界をこの下にぶら下げ、拡大縮小だけで実画面にフィットさせる。
   const world = new Container();
   app.stage.addChild(world);
+
+  // T8: 背景演出 + 常時の減光レイヤー。05_PHASE0_TASKS.md T8 参照。
+  // 減光レイヤーは、将来ここに乗る背景がどれだけ明るくても弾が視認できることを保証する土台。
+  const background = new Background(app.renderer);
+  world.addChild(background.view);
+  const dimLayer = new Graphics().rect(0, 0, LOGICAL_WIDTH, LOGICAL_HEIGHT).fill(0x000000);
+  world.addChild(dimLayer);
+  const backgroundToggle = new BackgroundToggle(host);
+  background.setReduced(backgroundToggle.reduced);
+  dimLayer.alpha = backgroundToggle.reduced ? balance.visibility.reducedDimAlpha : balance.visibility.dimAlpha;
+  backgroundToggle.onChange = (reduced) => {
+    background.setReduced(reduced);
+    dimLayer.alpha = reduced ? balance.visibility.reducedDimAlpha : balance.visibility.dimAlpha;
+  };
 
   // Phase 0 の土台確認用: プレイフィールドの境界を可視化する仮素材。
   const bounds = new Graphics()
@@ -81,7 +97,7 @@ async function bootstrap(): Promise<void> {
     bulletSpeed: balance.mainGun.bulletSpeed,
     bulletCount: balance.mainGun.bulletCount,
     damage: balance.player.atk,
-    spread: 14,
+    spread: balance.mainGun.spread,
   });
   const enemySystem = new EnemySystem();
 
@@ -207,6 +223,8 @@ async function bootstrap(): Promise<void> {
 
   const loop = new FixedStepLoop({
     update: (dt) => {
+      // 背景はヒットストップ中やリザルト画面でも動き続けてよい(純粋な演出のため最初に更新する)。
+      background.update(dt);
       // T5: ヒットストップ中は全システムの更新を止める(0.06秒の「画面が止まる」演出)。
       if (hitStopRemaining > 0) {
         hitStopRemaining -= dt;

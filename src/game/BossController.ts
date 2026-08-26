@@ -213,7 +213,8 @@ export class BossController {
   }
 
   private redrawBody(): void {
-    const color = this.state === 'telegraphing' ? 0xffe9a8 : this.state === 'stunned' ? 0x8f7fbf : 0xff3fa4;
+    // マゼンタ(#FF3FA4)はチャージ弾専用の色相のため、ボス本体(fighting時)は危険色の橙赤にする(T8 視認性ルール)。
+    const color = this.state === 'telegraphing' ? 0xffe9a8 : this.state === 'stunned' ? 0x8f7fbf : 0xff5a3c;
     this.body.clear().circle(0, 0, def.hitRadius).fill(color).stroke({ width: 3, color: 0x1a1020 });
     this.body.x = this.x;
     this.body.y = this.y;

@@ -41,7 +41,8 @@ export class WaveHud extends Container {
 
   showResult(status: 'cleared' | 'failed'): void {
     this.resultText.text = status === 'cleared' ? 'STAGE CLEAR\n(タップでリトライ)' : 'GAME OVER\n(タップでリトライ)';
-    this.resultText.style.fill = status === 'cleared' ? '#7fe8ff' : '#ff3fa4';
+    // マゼンタ(#FF3FA4)はチャージ弾専用の色相のため、失敗表示は危険色の橙赤にする(T8 視認性ルール)。
+    this.resultText.style.fill = status === 'cleared' ? '#7fe8ff' : '#ff5a3c';
     this.resultText.visible = true;
   }
 }

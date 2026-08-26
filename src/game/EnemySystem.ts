@@ -84,9 +84,11 @@ export class EnemySystem {
     this.hitDamageScratch = new Float32Array(balance.bullets.maxActivePlayerBullets);
 
     for (let i = 0; i < this.capacity; i += 1) {
+      // 旧配色(0xD65F8A)はマゼンタに近い色相でチャージ弾と紛らわしかったため、
+      // 弾専用の色相と明確に離れた緑系に変更した(05_PHASE0_TASKS.md T8 視認性ルール)。
       const g = new Graphics()
         .circle(0, 0, def.hitRadius)
-        .fill(0xd65f8a)
+        .fill(0x6fbf6f)
         .stroke({ width: 2, color: 0x1a1020 });
       g.visible = false;
       this.graphics.push(g);

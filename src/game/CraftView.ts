@@ -39,7 +39,9 @@ export class CraftView extends Container {
   }
 
   setState(state: CraftState): void {
-    const color = state === 'MOVE' ? 0x7fe8ff : state === 'COUNTER' ? 0xff3fa4 : 0x8f7fbf;
+    // マゼンタ(#FF3FA4)はチャージ弾専用の色相として予約するため(05_PHASE0_TASKS.md T8)、
+    // COUNTER状態は「吸収した弾のエネルギーを解放する」意味を込めて白(自機弾と同系の暖色寄りの光)にする。
+    const color = state === 'MOVE' ? 0x7fe8ff : state === 'COUNTER' ? 0xffffff : 0x8f7fbf;
     this.body.clear().poly([0, -this.bodyRadius, this.bodyRadius * 0.75, this.bodyRadius, -this.bodyRadius * 0.75, this.bodyRadius]).fill(color).stroke({ width: 2, color: 0x1a1020 });
     this.stateLabel.text = state;
   }
@@ -50,6 +52,7 @@ export class CraftView extends Container {
     if (charge <= 0) return;
     const t = Math.max(0, Math.min(1, charge / chargeMax));
     const ringRadius = this.bodyRadius + 8 + t * 28;
-    this.chargeRing.circle(0, 0, ringRadius).stroke({ width: 3 + t * 4, color: 0xff3fa4, alpha: 0.35 + t * 0.55 });
+    // マゼンタ色相はチャージ弾専用のため、リングは白で表現する(T8 視認性ルール)。
+    this.chargeRing.circle(0, 0, ringRadius).stroke({ width: 3 + t * 4, color: 0xffffff, alpha: 0.35 + t * 0.55 });
   }
 }

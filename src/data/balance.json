@@ -8,7 +8,8 @@
   "mainGun": {
     "fireInterval": 0.12,
     "bulletSpeed": 1400,
-    "bulletCount": 2
+    "bulletCount": 2,
+    "spread": 14
   },
   "drain": {
     "radius": 260,
@@ -37,11 +38,8 @@
     "poolSize": 1200,
     "maxActiveEnemyBullets": 600,
     "maxActivePlayerBullets": 400,
-    "chargeableRate": {
-      "normalWave": 0.3,
-      "bossWave": 0.35,
-      "hardWave": 0.2
-    }
+    "_chargeCapacityRatioComment": "enemyCharge/enemyNormalの2プールへの容量配分比。実際の発生確率(chargeable)はenemies.json/bosses.jsonの各fireScript/patternが個別に持つ(通常0.30、ボスの大技のみ0.6〜0.7に上げて「溜めて返す」設計にしている、02_CORE_SPEC.md §5.4)。ここはその中で最も高いボス戦想定(0.35)に容量を合わせておくことで、大技連発時にプール枯渇でチャージ弾が欠落しないようにするための値。",
+    "chargeCapacityRatio": 0.35
   },
   "player": {
     "atk": 10,
@@ -51,5 +49,10 @@
   },
   "enemySystem": {
     "capacity": 40
+  },
+  "visibility": {
+    "_comment": "05_PHASE0_TASKS.md T8。背景の上に常時のせる減光レイヤー。トグルONで演出停止+より濃く。",
+    "dimAlpha": 0.28,
+    "reducedDimAlpha": 0.45
   }
 }

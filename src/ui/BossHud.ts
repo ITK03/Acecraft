@@ -18,9 +18,10 @@ export class BossHud extends Container {
     super();
     this.barBg = new Graphics().rect(this.barX, this.barY, this.barWidth, this.barHeight).fill(0x2a1f3d);
     this.barFill = new Graphics();
+    // マゼンタ(#FF3FA4)はチャージ弾専用の色相のため、HPバーは危険色の橙赤にする(T8 視認性ルール)。
     this.labelText = new Text({
       text: 'BOSS',
-      style: new TextStyle({ fill: '#ff3fa4', fontFamily: 'monospace', fontSize: 14 }),
+      style: new TextStyle({ fill: '#ff5a3c', fontFamily: 'monospace', fontSize: 14 }),
     });
     this.labelText.x = this.barX;
     this.labelText.y = this.barY - 18;
@@ -32,7 +33,7 @@ export class BossHud extends Container {
   update(hpRatio: number): void {
     this.visible = true;
     const t = Math.max(0, Math.min(1, hpRatio));
-    this.barFill.clear().rect(this.barX, this.barY, this.barWidth * t, this.barHeight).fill(0xff3fa4);
+    this.barFill.clear().rect(this.barX, this.barY, this.barWidth * t, this.barHeight).fill(0xff5a3c);
   }
 
   hide(): void {
