@@ -30,7 +30,10 @@
     "particleFlightSeconds": 0.35,
     "chargePerBullet": 3,
     "bulletSpeed": 1800,
-    "spreadDeg": 100
+    "spreadDeg": 100,
+    "_homingComment": "ユーザーフィードバック「カウンター攻撃は若干敵を追尾するように」。速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。",
+    "homingTurnRateDeg": 150,
+    "homingSearchRadius": 450
   },
   "ultimate": {
     "gaugeMax": 100,

@@ -267,6 +267,27 @@ export class EnemySystem {
     }
   }
 
+  /**
+   * カウンター弾の追尾用。(x,y)から半径maxDistance以内で最も近いアクティブな敵の座標をoutに
+   * 書き込み、見つかれば true を返す(毎フレーム呼ばれうるためoutを使い回してアロケーションを避ける)。
+   */
+  findNearestActiveEnemy(x: number, y: number, maxDistance: number, out: { x: number; y: number }): boolean {
+    let bestDistSq = maxDistance * maxDistance;
+    let found = false;
+    this.pool.forEachActive((enemy) => {
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= bestDistSq) {
+        bestDistSq = distSq;
+        out.x = enemy.x;
+        out.y = enemy.y;
+        found = true;
+      }
+    });
+    return found;
+  }
+
   private rebuildGrid(): void {
     let count = 0;
     this.pool.forEachActive((enemy, index) => {

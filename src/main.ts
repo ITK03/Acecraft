@@ -179,6 +179,28 @@ async function bootstrap(): Promise<void> {
     audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
   };
 
+  // カウンター弾の追尾先探索(ユーザーフィードバック「若干敵を追尾するように」)。
+  // 敵とボスの両方から一番近い方を選ぶ。毎フレーム呼ばれうるのでアロケーションしない(out書き込み方式)。
+  const homingTurnRateRad = (balance.counter.homingTurnRateDeg * Math.PI) / 180;
+  const homingSearchRadiusSq = balance.counter.homingSearchRadius * balance.counter.homingSearchRadius;
+  const findCounterBulletTarget = (x: number, y: number, out: { x: number; y: number }): boolean => {
+    const foundEnemy = enemySystem.findNearestActiveEnemy(x, y, balance.counter.homingSearchRadius, out);
+    if (bossController && bossController.state !== 'entering' && bossController.state !== 'defeated') {
+      const dx = bossController.x - x;
+      const dy = bossController.y - y;
+      const bossDistSq = dx * dx + dy * dy;
+      if (bossDistSq <= homingSearchRadiusSq) {
+        const enemyDistSq = foundEnemy ? (out.x - x) ** 2 + (out.y - y) ** 2 : Infinity;
+        if (bossDistSq < enemyDistSq) {
+          out.x = bossController.x;
+          out.y = bossController.y;
+          return true;
+        }
+      }
+    }
+    return foundEnemy;
+  };
+
   // 描画順: 敵 -> 弾 -> スコア粒子 -> ドレイン範囲 -> 自機 -> 画面フラッシュ(自機が前面、フラッシュは最前面)
   world.addChild(enemySystem.view);
   world.addChild(bulletSystem.view);
@@ -250,6 +272,8 @@ async function bootstrap(): Promise<void> {
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
       drainField.update(dt, craft, bulletSystem);
+      // カウンター弾の追尾も同様に、移動計算(bulletSystem.update)より前に速度の向きを曲げる。
+      bulletSystem.steerCounterBullets(dt, homingTurnRateRad, findCounterBulletTarget);
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       enemySystem.update(dt, craft.x, craft.y, bulletSystem);
 

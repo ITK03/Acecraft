@@ -63,6 +63,8 @@ function enemyNormalCapacity(): number {
 export class BulletSystem {
   private readonly entries: Record<BulletKind, KindEntry>;
   readonly view = new Container();
+  // steerCounterBullets の findTarget コールバック用の使い回しバッファ(毎フレームnewしない)
+  private readonly steerTargetScratch = { x: 0, y: 0 };
 
   constructor(renderer: Renderer) {
     this.entries = {
@@ -120,6 +122,29 @@ export class BulletSystem {
       const vy = Math.sin(angle) * speed;
       this.spawn('counter', x, y, vx, vy, damagePerBullet, false);
     }
+  }
+
+  /**
+   * カウンター弾をわずかに追尾させる(ユーザーフィードバック「若干敵を追尾するように」)。
+   * 速さは変えず、進行方向だけを目標へ turnRateRad*dt ずつ曲げる(即座に照準を合わせる
+   * ホーミングにはしない = 完全な誘導ではなく「若干」の効果に留める)。
+   * bulletSystem.update() より前に呼ぶこと(このフレームの移動に反映させるため)。
+   */
+  steerCounterBullets(dt: number, turnRateRad: number, findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean): void {
+    const target = this.steerTargetScratch;
+    this.entries.counter.pool.forEachActive((bullet) => {
+      if (!findTarget(bullet.x, bullet.y, target)) return;
+      const targetAngle = Math.atan2(target.y - bullet.y, target.x - bullet.x);
+      const currentAngle = Math.atan2(bullet.vy, bullet.vx);
+      // -PI..PIに正規化して最短回転方向を選ぶ
+      const diff = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));
+      const maxStep = turnRateRad * dt;
+      const step = Math.max(-maxStep, Math.min(maxStep, diff));
+      const newAngle = currentAngle + step;
+      const speed = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
+      bullet.vx = Math.cos(newAngle) * speed;
+      bullet.vy = Math.sin(newAngle) * speed;
+    });
   }
 
   private spawn(kind: BulletKind, x: number, y: number, vx: number, vy: number, damage: number, chargeable: boolean): void {
