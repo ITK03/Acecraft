@@ -52,3 +52,12 @@ export const PLAYER_BULLET: BulletVisualConfig = {
   outlineColor: 0x1a1020,
   outlineWidth: 2,
 };
+
+// カウンター弾(吸収した弾を反射する強力な弾、02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を
+// 生成」)。主砲弾より明確に大きく・強く見えるよう、T8で「チャージ状態」の色として統一した白にする。
+export const COUNTER_BULLET: BulletVisualConfig = {
+  radius: 10,
+  fillColor: 0xffffff,
+  outlineColor: 0x1a1020,
+  outlineWidth: 2,
+};

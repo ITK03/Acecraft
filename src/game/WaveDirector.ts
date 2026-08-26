@@ -57,7 +57,7 @@ export class WaveDirector {
     if (this.spawnedInWave < wave.enemyCount) {
       this.spawnTimer -= dt;
       if (this.spawnTimer <= 0) {
-        if (enemySystem.trySpawnGrunt()) {
+        if (enemySystem.trySpawnWaveEnemy()) {
           this.spawnedInWave += 1;
         }
         this.spawnTimer += wave.spawnInterval;

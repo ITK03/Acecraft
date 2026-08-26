@@ -69,6 +69,8 @@ export class BossController {
   private driftDir = 1;
 
   private readonly hitBulletScratch = new Int32Array(HIT_SCRATCH_SIZE);
+  private readonly hitBulletKindScratch = new Uint8Array(HIT_SCRATCH_SIZE);
+  private readonly hitDamageScratch = new Float32Array(HIT_SCRATCH_SIZE);
 
   onDefeated?: () => void;
 
@@ -156,26 +158,31 @@ export class BossController {
     }
   }
 
-  /** 自弾との衝突判定と消費、ダメージ適用までまとめて行う */
-  resolvePlayerBulletHits(bulletSystem: BulletSystem, damage: number): void {
+  /**
+   * 自弾との衝突判定と消費、ダメージ適用までまとめて行う。
+   * ダメージは弾ごとの bullet.damage をそのまま使う(主砲弾は atk*1.0、カウンター弾はより高威力)。
+   */
+  resolvePlayerBulletHits(bulletSystem: BulletSystem): void {
     if (this.state === 'entering' || this.state === 'defeated') return; // 登場中は無敵
 
     let hitCount = 0;
-    bulletSystem.forEachActivePlayerBullet((bullet, index) => {
+    bulletSystem.forEachActivePlayerFactionBullet((bullet, kind, index) => {
       if (hitCount >= HIT_SCRATCH_SIZE) return;
       const dx = bullet.x - this.x;
       const dy = bullet.y - this.y;
       const rSum = def.hitRadius + bullet.radius;
       if (dx * dx + dy * dy > rSum * rSum) return;
       this.hitBulletScratch[hitCount] = index;
+      this.hitBulletKindScratch[hitCount] = kind === 'counter' ? 1 : 0;
+      this.hitDamageScratch[hitCount] = bullet.damage;
       hitCount += 1;
     });
 
     for (let i = 0; i < hitCount; i += 1) {
-      bulletSystem.consumeHit('player', this.hitBulletScratch[i]);
+      bulletSystem.consumeHit(this.hitBulletKindScratch[i] === 1 ? 'counter' : 'player', this.hitBulletScratch[i]);
       // TSの制御フロー解析は applyDamage() 内での this.state 変化を追えないため型アサーションで比較する
       if ((this.state as BossState) === 'defeated') continue; // 前のヒットで倒れていたら以降は無視
-      this.applyDamage(damage, bulletSystem);
+      this.applyDamage(this.hitDamageScratch[i], bulletSystem);
     }
   }
 
@@ -200,16 +207,6 @@ export class BossController {
       this.timer = def.phaseStunSeconds;
       bulletSystem.clearAllEnemyBullets(() => {}); // フェーズ遷移で画面内敵弾を一掃
     }
-  }
-
-  /** カウンターの範囲ダメージ用。命中していればダメージを与えて true を返す */
-  applyCounterBurst(x: number, y: number, radius: number, damage: number, bulletSystem: BulletSystem): boolean {
-    if (this.state === 'entering' || this.state === 'defeated') return false;
-    const dx = this.x - x;
-    const dy = this.y - y;
-    if (dx * dx + dy * dy > radius * radius) return false;
-    this.applyDamage(damage, bulletSystem);
-    return true;
   }
 
   private redrawBody(): void {

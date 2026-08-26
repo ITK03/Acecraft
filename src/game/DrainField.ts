@@ -1,3 +1,4 @@
+import { Container, Graphics } from 'pixi.js';
 import type { Craft } from './Craft';
 import type { BulletSystem } from './BulletSystem';
 
@@ -10,6 +11,10 @@ import type { BulletSystem } from './BulletSystem';
  * - craft.hitRadius + absorbMargin まで到達したら消滅させ、craft.charge を+1(上限 chargeMax)
  * - 通常弾(chargeable=false)には一切干渉しない(素通りしてクラフトに直接当たりうる)
  * - DRAIN に入ってからの経過時間で吸引力を rampUpSeconds かけて 0→全開にする
+ *
+ * ユーザーフィードバック「吸収できる範囲が分かりづらい」「吸収中のエフェクトが欲しい」を受け、
+ * 扇形の範囲そのものを半透明で描画し(ramp に応じてフェードイン)、吸収した瞬間にその弾の位置で
+ * 小さな閃光エフェクトを出すようにした。
  */
 
 export interface DrainFieldConfig {
@@ -22,14 +27,34 @@ export interface DrainFieldConfig {
   chargeMax: number;
 }
 
+const ABSORB_EFFECT_CAPACITY = 16;
+const ABSORB_EFFECT_DURATION = 0.22;
+// DRAIN状態の機体色(0x8F7FBF)と揃え、「今どの領域が吸引中か」を機体の色から連想できるようにする。
+const FIELD_COLOR = 0x8f7fbf;
+
+interface AbsorbEffect {
+  active: boolean;
+  life: number;
+  x: number;
+  y: number;
+}
+
 export class DrainField {
   private readonly config: DrainFieldConfig;
   private activeTime = 0;
   private wasActive = false;
 
   // update()内でPool.forEachActiveを回している最中に release すると密配列(スワップ削除)が
-  // 壊れるため、吸収対象の添字を先に集めてから走査後にまとめて absorb する。
+  // 壊れるため、吸収対象の添字(と、エフェクト表示用に消滅位置)を先に集めてから走査後にまとめて absorb する。
   private readonly absorbScratch: Int32Array;
+  private readonly absorbScratchX: Float32Array;
+  private readonly absorbScratchY: Float32Array;
+
+  readonly view = new Container();
+  private readonly coneGraphics = new Graphics();
+  private readonly absorbGraphics: Graphics[] = [];
+  private readonly absorbEffects: AbsorbEffect[] = [];
+  private nextAbsorbEffectSlot = 0;
 
   /** T5: 弾を1発吸収するたびに呼ばれる。吸引音の再生などに使う */
   onAbsorb?: (newCharge: number) => void;
@@ -37,6 +62,17 @@ export class DrainField {
   constructor(config: DrainFieldConfig, enemyChargeCapacity: number) {
     this.config = config;
     this.absorbScratch = new Int32Array(enemyChargeCapacity);
+    this.absorbScratchX = new Float32Array(enemyChargeCapacity);
+    this.absorbScratchY = new Float32Array(enemyChargeCapacity);
+
+    this.view.addChild(this.coneGraphics);
+    for (let i = 0; i < ABSORB_EFFECT_CAPACITY; i += 1) {
+      const g = new Graphics();
+      g.visible = false;
+      this.absorbGraphics.push(g);
+      this.view.addChild(g);
+      this.absorbEffects.push({ active: false, life: 0, x: 0, y: 0 });
+    }
   }
 
   /** 固定ステップで呼ぶ。bulletSystem.update() より前に呼ぶこと(このフレームの移動に反映させるため) */
@@ -44,7 +80,12 @@ export class DrainField {
     const isActive = craft.state === 'DRAIN';
     if (isActive && !this.wasActive) this.activeTime = 0;
     this.wasActive = isActive;
-    if (!isActive) return;
+    this.updateAbsorbEffects(dt);
+
+    if (!isActive) {
+      this.redrawCone(craft, 0);
+      return;
+    }
 
     this.activeTime += dt;
     const ramp = Math.min(1, this.activeTime / this.config.rampUpSeconds);
@@ -60,6 +101,8 @@ export class DrainField {
       if (distSq <= absorbDistance * absorbDistance) {
         if (absorbCount < this.absorbScratch.length) {
           this.absorbScratch[absorbCount] = index;
+          this.absorbScratchX[absorbCount] = bullet.x;
+          this.absorbScratchY[absorbCount] = bullet.y;
           absorbCount += 1;
         }
         return;
@@ -85,7 +128,63 @@ export class DrainField {
     for (let i = 0; i < absorbCount; i += 1) {
       bulletSystem.absorbEnemyChargeBullet(this.absorbScratch[i]);
       craft.charge = Math.min(this.config.chargeMax, craft.charge + 1);
+      this.spawnAbsorbEffect(this.absorbScratchX[i], this.absorbScratchY[i]);
       this.onAbsorb?.(craft.charge);
     }
+
+    this.redrawCone(craft, ramp);
+  }
+
+  private spawnAbsorbEffect(x: number, y: number): void {
+    // 超短命なエフェクトのため専用Poolは過剰。固定サイズのリングバッファで使い回す。
+    const slot = this.nextAbsorbEffectSlot;
+    this.nextAbsorbEffectSlot = (this.nextAbsorbEffectSlot + 1) % ABSORB_EFFECT_CAPACITY;
+    const effect = this.absorbEffects[slot];
+    effect.active = true;
+    effect.life = ABSORB_EFFECT_DURATION;
+    effect.x = x;
+    effect.y = y;
+    this.absorbGraphics[slot].visible = true;
+  }
+
+  private updateAbsorbEffects(dt: number): void {
+    for (let i = 0; i < ABSORB_EFFECT_CAPACITY; i += 1) {
+      const effect = this.absorbEffects[i];
+      if (!effect.active) continue;
+      effect.life -= dt;
+      const g = this.absorbGraphics[i];
+      if (effect.life <= 0) {
+        effect.active = false;
+        g.visible = false;
+        continue;
+      }
+      const t = 1 - effect.life / ABSORB_EFFECT_DURATION;
+      g.clear()
+        .circle(0, 0, 4 + t * 16)
+        .stroke({ width: 3, color: 0xffffff, alpha: (1 - t) * 0.9 });
+      g.x = effect.x;
+      g.y = effect.y;
+    }
+  }
+
+  private redrawCone(craft: Craft, ramp: number): void {
+    this.coneGraphics.clear();
+    if (ramp <= 0) return;
+
+    const angleRad = (this.config.angleDeg * Math.PI) / 180;
+    const startAngle = -Math.PI / 2 - angleRad;
+    const endAngle = -Math.PI / 2 + angleRad;
+    const steps = 20;
+    const points: number[] = [0, 0];
+    for (let i = 0; i <= steps; i += 1) {
+      const a = startAngle + ((endAngle - startAngle) * i) / steps;
+      points.push(Math.cos(a) * this.config.radius, Math.sin(a) * this.config.radius);
+    }
+    this.coneGraphics
+      .poly(points)
+      .fill({ color: FIELD_COLOR, alpha: 0.08 * ramp })
+      .stroke({ width: 2, color: FIELD_COLOR, alpha: 0.35 * ramp });
+    this.coneGraphics.x = craft.x;
+    this.coneGraphics.y = craft.y;
   }
 }

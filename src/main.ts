@@ -35,6 +35,11 @@ async function bootstrap(): Promise<void> {
   const host = document.getElementById('app');
   if (!host) throw new Error('#app element not found');
 
+  // iOS Safariはtouch-action:none/overscroll-behavior:noneのCSSだけでは、下スワイプ時に
+  // 画面全体がバウンド/スクロールしてしまうことがある(ユーザーフィードバックにより追加)。
+  // ドキュメント全体でtouchmoveの既定動作を止める、最後の砦としての対策。
+  document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
   const app = new Application();
   await app.init({
     background: '#0a0612',
@@ -159,21 +164,26 @@ async function bootstrap(): Promise<void> {
   });
 
   craft.onCounterFire = (charge) => {
-    const damage = balance.player.atk * balance.counter.baseRatio * (1 + charge * balance.counter.scale);
+    // ユーザーフィードバックにより「吸収した弾を強力なカウンター弾として反射する」実装に変更。
+    // 02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」。総ダメージは既存の式のまま、
+    // それを chargePerBullet ごとに1発のカウンター弾へ分配して実際に飛ばし、命中判定させる。
+    const totalDamage = balance.player.atk * balance.counter.baseRatio * (1 + charge * balance.counter.scale);
+    const bulletCount = Math.max(1, Math.round(charge / balance.counter.chargePerBullet));
+    const damagePerBullet = totalDamage / bulletCount;
     if (charge >= balance.counter.clearThreshold) {
       bulletSystem.clearAllEnemyBullets((x, y) => scoreParticles.spawn(x, y));
     }
-    enemySystem.applyCounterBurst(craft.x, craft.y, balance.counter.burstRadius, damage);
-    bossController?.applyCounterBurst(craft.x, craft.y, balance.counter.burstRadius, damage, bulletSystem);
+    bulletSystem.spawnCounterBullets(craft.x, craft.y, bulletCount, damagePerBullet, balance.counter.bulletSpeed, balance.counter.spreadDeg);
     hitStopRemaining = balance.counter.hitStopSeconds;
     flashAlpha = 1;
     audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
   };
 
-  // 描画順: 敵 -> 弾 -> スコア粒子 -> 自機 -> 画面フラッシュ(弾が敵の下、自機が前面、フラッシュは最前面)
+  // 描画順: 敵 -> 弾 -> スコア粒子 -> ドレイン範囲 -> 自機 -> 画面フラッシュ(自機が前面、フラッシュは最前面)
   world.addChild(enemySystem.view);
   world.addChild(bulletSystem.view);
   world.addChild(scoreParticles.view);
+  world.addChild(drainField.view);
   world.addChild(craftView);
   world.addChild(screenFlash);
   world.addChild(waveHud);
@@ -274,7 +284,7 @@ async function bootstrap(): Promise<void> {
       waveDirector.update(dt, enemySystem);
       if (bossController) {
         bossController.update(dt, craft.x, craft.y, bulletSystem);
-        bossController.resolvePlayerBulletHits(bulletSystem, balance.player.atk);
+        bossController.resolvePlayerBulletHits(bulletSystem);
       }
       scoreParticles.update(dt, craft.x, craft.y);
       stressTest?.update(dt);

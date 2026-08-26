@@ -1,10 +1,11 @@
 {
-  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。T3で移動、T4でfireScript(aimed/spread)を追加。",
+  "_comment": "02_CORE_SPEC.md §5.1 EnemyDef。T3で移動、T4でfireScript(aimed/spread)を追加。ユーザーフィードバック(敵の行動がワンパターン)を受け、moveScript(02_CORE_SPEC.md §5.2)を追加し敵種を2種類にした。",
   "grunt": {
     "hp": 25,
     "scoreXp": 4,
     "hitRadius": 22,
     "wrapAround": true,
+    "moveScript": "straightDown",
     "fallSpeed": 220,
     "contactDamage": 10,
     "fireScript": {
@@ -13,6 +14,24 @@
       "spreadAngleDeg": 40,
       "speed": 260,
       "cooldown": 1.8,
+      "chargeableRate": 0.3
+    }
+  },
+  "seeker": {
+    "hp": 16,
+    "scoreXp": 5,
+    "hitRadius": 20,
+    "wrapAround": true,
+    "moveScript": "sineDown",
+    "fallSpeed": 170,
+    "sineAmplitude": 90,
+    "sineFrequency": 1.6,
+    "contactDamage": 10,
+    "fireScript": {
+      "pattern": "aimed",
+      "count": 1,
+      "speed": 300,
+      "cooldown": 1.3,
       "chargeableRate": 0.3
     }
   }

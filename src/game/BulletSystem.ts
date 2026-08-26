@@ -1,6 +1,6 @@
 import { Container, Particle, ParticleContainer, type Renderer } from 'pixi.js';
 import { Pool, type Poolable } from '../core/Pool';
-import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET, type BulletVisualConfig } from './BulletTextures';
+import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET, COUNTER_BULLET, type BulletVisualConfig } from './BulletTextures';
 import balance from '../data/balance.json';
 
 /**
@@ -31,8 +31,8 @@ export interface Bullet extends Poolable {
   pierce: number;
 }
 
-export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player';
-const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player'];
+export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter';
+const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter'];
 
 const OFFSCREEN_MARGIN = 120;
 // Particle を隠す(=解放中であることを示す)ためのパーキング座標。位置は dynamic property なので
@@ -69,8 +69,14 @@ export class BulletSystem {
       enemyNormal: this.makeEntry(renderer, enemyNormalCapacity(), ENEMY_NORMAL_BULLET, 'enemy'),
       enemyCharge: this.makeEntry(renderer, enemyChargeCapacity(), ENEMY_CHARGE_BULLET, 'enemy'),
       player: this.makeEntry(renderer, balance.bullets.maxActivePlayerBullets, PLAYER_BULLET, 'player'),
+      counter: this.makeEntry(renderer, balance.bullets.maxActiveCounterBullets, COUNTER_BULLET, 'player'),
     };
-    this.view.addChild(this.entries.enemyNormal.container, this.entries.enemyCharge.container, this.entries.player.container);
+    this.view.addChild(
+      this.entries.enemyNormal.container,
+      this.entries.enemyCharge.container,
+      this.entries.player.container,
+      this.entries.counter.container,
+    );
   }
 
   private makeEntry(renderer: Renderer, capacity: number, visual: BulletVisualConfig, faction: Bullet['faction']): KindEntry {
@@ -98,6 +104,22 @@ export class BulletSystem {
 
   spawnEnemyBullet(kind: 'enemyNormal' | 'enemyCharge', x: number, y: number, vx: number, vy: number, damage: number): void {
     this.spawn(kind, x, y, vx, vy, damage, kind === 'enemyCharge');
+  }
+
+  /**
+   * カウンター弾(吸収した弾の反射)。02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」。
+   * 主砲と違って毎フレームではなく発動の瞬間に count 発をまとめて、正面(上方向)を中心に
+   * spreadDeg 度の扇状にばら撒く。1発ずつが強力で見た目も主砲弾より大きく白い。
+   */
+  spawnCounterBullets(x: number, y: number, count: number, damagePerBullet: number, speed: number, spreadDeg: number): void {
+    const spreadRad = (spreadDeg * Math.PI) / 180;
+    for (let i = 0; i < count; i += 1) {
+      const t = count > 1 ? i / (count - 1) - 0.5 : 0; // -0.5..0.5(1発なら中央のみ)
+      const angle = -Math.PI / 2 + t * spreadRad; // 上方向(-90°)を中心に扇状
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.sin(angle) * speed;
+      this.spawn('counter', x, y, vx, vy, damagePerBullet, false);
+    }
   }
 
   private spawn(kind: BulletKind, x: number, y: number, vx: number, vy: number, damage: number, chargeable: boolean): void {
@@ -197,8 +219,10 @@ export class BulletSystem {
     return count;
   }
 
-  forEachActivePlayerBullet(fn: (bullet: Bullet, index: number) => void): void {
-    this.entries.player.pool.forEachActive(fn);
+  /** 主砲弾とカウンター弾をまとめて走査する(どちらも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
+  forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: 'player' | 'counter', index: number) => void): void {
+    this.entries.player.pool.forEachActive((bullet, index) => fn(bullet, 'player', index));
+    this.entries.counter.pool.forEachActive((bullet, index) => fn(bullet, 'counter', index));
   }
 
   forEachActiveEnemyChargeBullet(fn: (bullet: Bullet, index: number) => void): void {
@@ -211,7 +235,12 @@ export class BulletSystem {
   }
 
   get activeCount(): number {
-    return this.entries.enemyNormal.pool.activeCount + this.entries.enemyCharge.pool.activeCount + this.entries.player.pool.activeCount;
+    return (
+      this.entries.enemyNormal.pool.activeCount +
+      this.entries.enemyCharge.pool.activeCount +
+      this.entries.player.pool.activeCount +
+      this.entries.counter.pool.activeCount
+    );
   }
 
   /** チャージ弾プールの総容量。呼び出し側(DrainFieldの吸収スクラッチ等)のサイズ決めに使う */

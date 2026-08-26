@@ -30,6 +30,10 @@ export class PointerInput {
     this.toLogical = toLogical;
 
     this.handleDown = (e: PointerEvent): void => {
+      // CSSのtouch-action:noneだけでは、iOS Safariの下スワイプ時に画面全体が
+      // バウンド/スクロールしてしまう(下方向にクラフトを動かせない)ケースがあるため、
+      // JS側でも明示的にpreventDefaultする(ユーザーフィードバックにより追加)。
+      if (e.cancelable) e.preventDefault();
       if (this.activePointerId !== null) return; // 最初の1本だけ追従する
       this.activePointerId = e.pointerId;
       this.target.setPointerCapture(e.pointerId);
@@ -41,6 +45,7 @@ export class PointerInput {
 
     this.handleMove = (e: PointerEvent): void => {
       if (e.pointerId !== this.activePointerId) return;
+      if (e.cancelable) e.preventDefault();
       const p = this.toLogical(e.clientX, e.clientY);
       this.state.x = p.x;
       this.state.y = p.y;
@@ -52,8 +57,9 @@ export class PointerInput {
       this.state.isDown = false;
     };
 
-    target.addEventListener('pointerdown', this.handleDown);
-    target.addEventListener('pointermove', this.handleMove);
+    // passive:false を明示しないと、ブラウザによってはpreventDefault()が無視されうる。
+    target.addEventListener('pointerdown', this.handleDown, { passive: false });
+    target.addEventListener('pointermove', this.handleMove, { passive: false });
     target.addEventListener('pointerup', this.handleUp);
     target.addEventListener('pointercancel', this.handleUp);
   }

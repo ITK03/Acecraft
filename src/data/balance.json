@@ -23,11 +23,14 @@
   "counter": {
     "duration": 0.35,
     "clearThreshold": 10,
+    "_damageComment": "baseRatio/scale は「今回のカウンター全体の総ダメージ」を決める。それを下のchargePerBulletで割った数のカウンター弾に分配して反射する(ユーザーフィードバックで実装。02_CORE_SPEC.md §3.4の「charge の数だけカウンター弾を生成」を、既存の総ダメージ計算式と両立する形に調整した)。",
     "baseRatio": 3.0,
     "scale": 0.08,
     "hitStopSeconds": 0.06,
-    "burstRadius": 320,
-    "particleFlightSeconds": 0.35
+    "particleFlightSeconds": 0.35,
+    "chargePerBullet": 3,
+    "bulletSpeed": 1800,
+    "spreadDeg": 100
   },
   "ultimate": {
     "gaugeMax": 100,
@@ -38,6 +41,7 @@
     "poolSize": 1200,
     "maxActiveEnemyBullets": 600,
     "maxActivePlayerBullets": 400,
+    "maxActiveCounterBullets": 40,
     "_chargeCapacityRatioComment": "enemyCharge/enemyNormalの2プールへの容量配分比。実際の発生確率(chargeable)はenemies.json/bosses.jsonの各fireScript/patternが個別に持つ(通常0.30、ボスの大技のみ0.6〜0.7に上げて「溜めて返す」設計にしている、02_CORE_SPEC.md §5.4)。ここはその中で最も高いボス戦想定(0.35)に容量を合わせておくことで、大技連発時にプール枯渇でチャージ弾が欠落しないようにするための値。",
     "chargeCapacityRatio": 0.35
   },
