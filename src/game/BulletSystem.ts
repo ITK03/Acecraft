@@ -128,13 +128,24 @@ export class BulletSystem {
    * カウンター弾をわずかに追尾させる(ユーザーフィードバック「若干敵を追尾するように」)。
    * 速さは変えず、進行方向だけを目標へ turnRateRad*dt ずつ曲げる(即座に照準を合わせる
    * ホーミングにはしない = 完全な誘導ではなく「若干」の効果に留める)。
+   * minDistance未満まで近づいたら追尾を止める(直進させる)。至近距離まで旋回速度で
+   * 曲げ続けると目標の周りをクルクル回り続けてしまう(ユーザーフィードバックで判明した不具合)ため。
    * bulletSystem.update() より前に呼ぶこと(このフレームの移動に反映させるため)。
    */
-  steerCounterBullets(dt: number, turnRateRad: number, findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean): void {
+  steerCounterBullets(
+    dt: number,
+    turnRateRad: number,
+    minDistance: number,
+    findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean,
+  ): void {
     const target = this.steerTargetScratch;
+    const minDistanceSq = minDistance * minDistance;
     this.entries.counter.pool.forEachActive((bullet) => {
       if (!findTarget(bullet.x, bullet.y, target)) return;
-      const targetAngle = Math.atan2(target.y - bullet.y, target.x - bullet.x);
+      const dx = target.x - bullet.x;
+      const dy = target.y - bullet.y;
+      if (dx * dx + dy * dy < minDistanceSq) return; // 至近距離では旋回させず直進に任せる
+      const targetAngle = Math.atan2(dy, dx);
       const currentAngle = Math.atan2(bullet.vy, bullet.vx);
       // -PI..PIに正規化して最短回転方向を選ぶ
       const diff = Math.atan2(Math.sin(targetAngle - currentAngle), Math.cos(targetAngle - currentAngle));

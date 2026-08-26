@@ -8,7 +8,8 @@
     "dragSensitivity": 1.8
   },
   "mainGun": {
-    "fireInterval": 0.12,
+    "_fireIntervalComment": "ユーザーフィードバック「こちらの攻撃も強すぎる、今の半分くらいでいい」。連射間隔を倍にして実質DPSを半減させた(0.12→0.24)。",
+    "fireInterval": 0.24,
     "bulletSpeed": 1100,
     "bulletCount": 2,
     "spread": 14
@@ -33,9 +34,10 @@
     "chargePerBullet": 3,
     "bulletSpeed": 1200,
     "spreadDeg": 100,
-    "_homingComment": "ユーザーフィードバック「追尾弾と通常弾の違いがほとんどわからないし全然追尾してない」。弾速を落として画面に留まる時間を増やし、旋回速度も大幅に上げてはっきり曲がって見えるようにした。速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。",
-    "homingTurnRateDeg": 420,
-    "homingSearchRadius": 550
+    "_homingComment": "速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。420度/秒は強すぎて至近距離で目標の周りをクルクル回り続ける不具合(ユーザーフィードバック)が出たため220まで落とし、homingMinDistance未満まで近づいたら追尾自体を切って直進させるようにした(それ以上曲げる必要がないほど近いため)。",
+    "homingTurnRateDeg": 220,
+    "homingSearchRadius": 550,
+    "homingMinDistance": 60
   },
   "ultimate": {
     "gaugeMax": 100,

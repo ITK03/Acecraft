@@ -1,31 +1,31 @@
 {
-  "_comment": "02_CORE_SPEC.md §6 BossDef。T7時点ではsentinel1種のみ。フェーズごとに小技+大技(チャージ弾多め)を持つ。",
+  "_comment": "02_CORE_SPEC.md §6 BossDef。T7時点ではsentinel1種のみ。フェーズごとに小技+大技(チャージ弾多め)を持つ。ユーザーフィードバック「弱すぎる、HPを増やし弾数を減らして威力は増やしていい、回避ゲーにしたい」を受け、HP増・弾数減・威力増の方向で再調整した。",
   "sentinel": {
     "hpBars": 3,
-    "hpPerBar": 220,
+    "hpPerBar": 320,
     "hitRadius": 64,
     "entryCutsceneSeconds": 2.0,
     "phaseStunSeconds": 0.5,
     "telegraphSeconds": 1.0,
     "moveSpeed": 70,
-    "bulletDamage": 20,
+    "bulletDamage": 26,
     "phases": [
       {
-        "pattern": { "type": "ring", "count": 12, "speed": 150, "chargeableRate": 0.25 },
+        "pattern": { "type": "ring", "count": 7, "speed": 150, "chargeableRate": 0.25 },
         "patternCooldown": 1.6,
-        "bigAttack": { "type": "spread", "count": 9, "spreadAngleDeg": 110, "speed": 180, "chargeableRate": 0.6 },
+        "bigAttack": { "type": "spread", "count": 6, "spreadAngleDeg": 110, "speed": 180, "chargeableRate": 0.6 },
         "bigAttackInterval": 5.0
       },
       {
-        "pattern": { "type": "ring", "count": 16, "speed": 170, "chargeableRate": 0.3 },
+        "pattern": { "type": "ring", "count": 9, "speed": 170, "chargeableRate": 0.3 },
         "patternCooldown": 1.3,
-        "bigAttack": { "type": "spread", "count": 12, "spreadAngleDeg": 130, "speed": 195, "chargeableRate": 0.65 },
+        "bigAttack": { "type": "spread", "count": 8, "spreadAngleDeg": 130, "speed": 195, "chargeableRate": 0.65 },
         "bigAttackInterval": 4.3
       },
       {
-        "pattern": { "type": "ring", "count": 20, "speed": 195, "chargeableRate": 0.35 },
+        "pattern": { "type": "ring", "count": 11, "speed": 195, "chargeableRate": 0.35 },
         "patternCooldown": 1.0,
-        "bigAttack": { "type": "spread", "count": 16, "spreadAngleDeg": 150, "speed": 210, "chargeableRate": 0.7 },
+        "bigAttack": { "type": "spread", "count": 10, "spreadAngleDeg": 150, "speed": 210, "chargeableRate": 0.7 },
         "bigAttackInterval": 3.6
       }
     ]

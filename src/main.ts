@@ -274,7 +274,7 @@ async function bootstrap(): Promise<void> {
       // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
       drainField.update(dt, craft, bulletSystem);
       // カウンター弾の追尾も同様に、移動計算(bulletSystem.update)より前に速度の向きを曲げる。
-      bulletSystem.steerCounterBullets(dt, homingTurnRateRad, findCounterBulletTarget);
+      bulletSystem.steerCounterBullets(dt, homingTurnRateRad, balance.counter.homingMinDistance, findCounterBulletTarget);
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       enemySystem.update(dt, craft.x, craft.y, bulletSystem);
 
