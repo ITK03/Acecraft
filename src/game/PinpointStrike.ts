@@ -10,6 +10,9 @@ import type { EnemySystem } from './EnemySystem';
 export interface PinpointStrikeConfig {
   interval: number;
   damage: number;
+  /** chip_targeting用。0〜1、発動時にダメージへ反映する */
+  critChance: number;
+  critDamageMultiplier: number;
 }
 
 const EFFECT_DURATION = 0.3;
@@ -18,7 +21,7 @@ const EFFECT_COLOR = 0xff4d4d;
 
 export class PinpointStrike {
   readonly view = new Container();
-  private config: PinpointStrikeConfig = { interval: 0, damage: 0 };
+  private config: PinpointStrikeConfig = { interval: 0, damage: 0, critChance: 0, critDamageMultiplier: 1 };
   private cooldown = 0;
   private readonly ring = new Graphics();
   private ringLife = 0;
@@ -45,7 +48,8 @@ export class PinpointStrike {
 
     const index = enemySystem.findHighestHpActiveEnemy(this.targetScratch);
     if (index === -1) return; // 画面内に敵がいなければ何もせず、次のクールダウンを待つ
-    enemySystem.applyDirectDamage(index, this.config.damage);
+    const damage = Math.random() < this.config.critChance ? this.config.damage * this.config.critDamageMultiplier : this.config.damage;
+    enemySystem.applyDirectDamage(index, damage);
     this.ringLife = EFFECT_DURATION;
     this.ring.visible = true;
     this.ring.x = this.targetScratch.x;

@@ -11,10 +11,13 @@ export interface HomingFlareConfig {
   interval: number;
   damage: number;
   speed: number;
+  /** chip_targeting用。0〜1、発射時にダメージへ反映する */
+  critChance: number;
+  critDamageMultiplier: number;
 }
 
 export class HomingFlare {
-  private config: HomingFlareConfig = { interval: 0, damage: 0, speed: 0 };
+  private config: HomingFlareConfig = { interval: 0, damage: 0, speed: 0, critChance: 0, critDamageMultiplier: 1 };
   private cooldown = 0;
 
   applyLoadout(config: HomingFlareConfig): void {
@@ -28,7 +31,8 @@ export class HomingFlare {
     this.cooldown -= dt;
     if (this.cooldown > 0) return;
     this.cooldown += this.config.interval;
+    const damage = Math.random() < this.config.critChance ? this.config.damage * this.config.critDamageMultiplier : this.config.damage;
     // 初速は上方向に撃ち出すだけ。曲げるのはsteerFlareBullets()の役割。
-    bulletSystem.spawnFlareBullet(craftX, craftY - 24, 0, -this.config.speed, this.config.damage);
+    bulletSystem.spawnFlareBullet(craftX, craftY - 24, 0, -this.config.speed, damage);
   }
 }

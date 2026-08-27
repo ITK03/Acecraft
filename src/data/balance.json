@@ -56,7 +56,9 @@
     "atk": 10,
     "maxHp": 100,
     "lives": 3,
-    "respawnInvincibleSeconds": 1.5
+    "respawnInvincibleSeconds": 1.5,
+    "_critDamageMultiplierComment": "chip_targeting(クリティカル率+%)用。02_CORE_SPEC.mdはクリティカル率のみ指定しており倍率は未指定のため、独自に+50%とした。[設計値]",
+    "critDamageMultiplier": 1.5
   },
   "enemySystem": {
     "capacity": 40

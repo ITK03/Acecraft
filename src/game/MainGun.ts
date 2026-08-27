@@ -13,6 +13,9 @@ export interface MainGunConfig {
   damage: number;
   /** 弾同士の左右オフセット(px)。[設計値] */
   spread: number;
+  /** chip_targeting用。0〜1、命中時ではなく発射時にダメージへ反映する */
+  critChance: number;
+  critDamageMultiplier: number;
 }
 
 export class MainGun {
@@ -40,10 +43,11 @@ export class MainGun {
   }
 
   private fire(craftX: number, craftY: number, bulletSystem: BulletSystem): void {
-    const { bulletCount, spread, bulletSpeed, damage } = this.config;
+    const { bulletCount, spread, bulletSpeed, damage, critChance, critDamageMultiplier } = this.config;
     for (let i = 0; i < bulletCount; i += 1) {
       const offset = (i - (bulletCount - 1) / 2) * spread;
-      bulletSystem.spawnPlayerBullet(craftX + offset, craftY - 24, 0, -bulletSpeed, damage);
+      const shotDamage = Math.random() < critChance ? damage * critDamageMultiplier : damage;
+      bulletSystem.spawnPlayerBullet(craftX + offset, craftY - 24, 0, -bulletSpeed, shotDamage);
     }
   }
 }

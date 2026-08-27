@@ -39,6 +39,7 @@ interface ChipLevelStats {
   healBonusPct?: number;
   drainRadiusBonusPct?: number;
   homingTurnRateBonusPct?: number;
+  critChanceBonusPct?: number;
 }
 interface ChipDef {
   name: string;
@@ -90,6 +91,8 @@ export interface StatModifiers {
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
   homingTurnRateMultiplier: number;
+  /** chip_targeting: クリティカル発生率(0〜1)。全ダメージ発生源で共通に判定する */
+  critChance: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -112,6 +115,7 @@ const BASE_MODIFIERS: StatModifiers = {
   strikeDamage: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
+  critChance: 0,
 };
 
 interface Candidate {
@@ -128,6 +132,7 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.healBonusPct !== undefined) return `回復量 +${stats.healBonusPct}%`;
   if (stats.drainRadiusBonusPct !== undefined) return `ドレイン範囲 +${stats.drainRadiusBonusPct}%`;
   if (stats.homingTurnRateBonusPct !== undefined) return `追尾性能 +${stats.homingTurnRateBonusPct}%`;
+  if (stats.critChanceBonusPct !== undefined) return `クリティカル率 +${stats.critChanceBonusPct}%`;
   return '';
 }
 
@@ -215,6 +220,7 @@ export class BuildSystem {
     let healBonusPct = 0;
     let drainRadiusBonusPct = 0;
     let homingTurnRateBonusPct = 0;
+    let critChanceBonusPct = 0;
     for (const [id, level] of this.chipLevels) {
       const stats = chips[id].levels[level - 1];
       atkBonusPct += stats.atkBonusPct ?? 0;
@@ -224,6 +230,7 @@ export class BuildSystem {
       healBonusPct += stats.healBonusPct ?? 0;
       drainRadiusBonusPct += stats.drainRadiusBonusPct ?? 0;
       homingTurnRateBonusPct += stats.homingTurnRateBonusPct ?? 0;
+      critChanceBonusPct += stats.critChanceBonusPct ?? 0;
     }
 
     // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
@@ -284,6 +291,7 @@ export class BuildSystem {
       strikeDamage,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
+      critChance: critChanceBonusPct / 100,
     };
     this.onModifiersChanged?.(this.modifiers);
   }

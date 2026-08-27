@@ -39,6 +39,8 @@ function computeMainGunConfig(modifiers: StatModifiers): MainGunConfig {
     bulletCount: balance.mainGun.bulletCount + modifiers.bulletCountBonus,
     damage: balance.player.atk * modifiers.atkMultiplier,
     spread: balance.mainGun.spread + modifiers.spreadBonusDeg,
+    critChance: modifiers.critChance,
+    critDamageMultiplier: balance.player.critDamageMultiplier,
   };
 }
 
@@ -170,8 +172,19 @@ async function bootstrap(): Promise<void> {
   buildSystem.onModifiersChanged = (modifiers) => {
     mainGun.applyLoadout(computeMainGunConfig(modifiers));
     orbitField.applyLoadout(modifiers.orbitCount, modifiers.orbitBlockRadius, modifiers.orbitRadius, modifiers.orbitSpeedRad);
-    homingFlare.applyLoadout({ interval: modifiers.flareInterval, damage: modifiers.flareDamage, speed: modifiers.flareSpeed });
-    pinpointStrike.applyLoadout({ interval: modifiers.strikeInterval, damage: modifiers.strikeDamage });
+    homingFlare.applyLoadout({
+      interval: modifiers.flareInterval,
+      damage: modifiers.flareDamage,
+      speed: modifiers.flareSpeed,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    pinpointStrike.applyLoadout({
+      interval: modifiers.strikeInterval,
+      damage: modifiers.strikeDamage,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
     drainField.applyRadiusMultiplier(modifiers.drainRadiusMultiplier);
   };
 
@@ -233,7 +246,10 @@ async function bootstrap(): Promise<void> {
     audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
   };
   craft.onCounterBulletFire = () => {
-    bulletSystem.spawnCounterBullets(craft.x, craft.y, 1, pendingDamagePerBullet, balance.counter.bulletSpeed, balance.counter.spreadDeg);
+    // chip_targeting: ストリームの1発ごとに独立してクリティカル判定する。
+    const damage =
+      Math.random() < buildSystem.modifiers.critChance ? pendingDamagePerBullet * balance.player.critDamageMultiplier : pendingDamagePerBullet;
+    bulletSystem.spawnCounterBullets(craft.x, craft.y, 1, damage, balance.counter.bulletSpeed, balance.counter.spreadDeg);
   };
 
   // カウンター弾の追尾先探索(ユーザーフィードバック「若干敵を追尾するように」)。
