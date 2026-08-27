@@ -81,6 +81,7 @@ const ENEMY_COLORS: Record<EnemyTypeId, number> = { grunt: 0x6fbf6f, seeker: 0xb
 const MAX_HIT_RADIUS = Math.max(...ENEMY_TYPE_IDS.map((id) => defs[id].hitRadius));
 const CONTACT_HIT_CAPACITY = 8;
 const BEAM_HIT_CAPACITY = 24;
+const RADIUS_HIT_CAPACITY = 24;
 
 function makeEnemy(): Enemy {
   return { active: false, typeId: 'grunt', x: 0, y: 0, baseX: 0, age: 0, hp: 0, maxHp: 0, fireCooldown: 0 };
@@ -113,6 +114,8 @@ export class EnemySystem {
   private readonly contactHitScratch = new Int32Array(CONTACT_HIT_CAPACITY);
   // applyBeamDamage(mod_laser)用の同種スクラッチ(範囲内の敵を先に集めてから走査後にダメージ適用する)
   private readonly beamHitScratch = new Int32Array(BEAM_HIT_CAPACITY);
+  // applyRadiusDamage(mod_blade)用の同種スクラッチ
+  private readonly radiusHitScratch = new Int32Array(RADIUS_HIT_CAPACITY);
 
   private readonly effectPool = new Pool<EffectParticle>(EFFECT_CAPACITY, makeEffect);
   private readonly effectGraphics: Graphics[] = [];
@@ -357,6 +360,27 @@ export class EnemySystem {
     });
     for (let i = 0; i < hitCount; i += 1) {
       this.applyDirectDamage(this.beamHitScratch[i], damage);
+    }
+  }
+
+  /**
+   * mod_blade用。(x,y)からradius以内のアクティブな敵全員へdamageを与える(範囲内なら何体でも命中)。
+   * applyBeamDamageと同じ理由でPool.forEachActive走査中にkillEnemyを呼べないため、
+   * 対象を先に集めてから走査後にまとめて処理する。
+   */
+  applyRadiusDamage(x: number, y: number, radius: number, damage: number): void {
+    const radiusSq = radius * radius;
+    let hitCount = 0;
+    this.pool.forEachActive((enemy, index) => {
+      if (hitCount >= this.radiusHitScratch.length) return;
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      if (dx * dx + dy * dy > radiusSq) return;
+      this.radiusHitScratch[hitCount] = index;
+      hitCount += 1;
+    });
+    for (let i = 0; i < hitCount; i += 1) {
+      this.applyDirectDamage(this.radiusHitScratch[i], damage);
     }
   }
 

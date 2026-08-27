@@ -24,6 +24,9 @@ interface ModuleLevelStats {
   strikeDamage?: number;
   laserHalfWidth?: number;
   laserDamagePerSecond?: number;
+  bladeRadius?: number;
+  bladeInterval?: number;
+  bladeDamage?: number;
 }
 interface ModuleDef {
   name: string;
@@ -92,6 +95,10 @@ export interface StatModifiers {
   /** mod_laser(ピアッシングレーザー)。damagePerSecond<=0で未所持扱い、LaserBeam側は何もしない */
   laserHalfWidth: number;
   laserDamagePerSecond: number;
+  /** mod_blade(ウイングブレード)。interval<=0で未所持扱い、WingBlade側は何もしない */
+  bladeRadius: number;
+  bladeInterval: number;
+  bladeDamage: number;
   /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
@@ -120,6 +127,9 @@ const BASE_MODIFIERS: StatModifiers = {
   strikeDamage: 0,
   laserHalfWidth: 0,
   laserDamagePerSecond: 0,
+  bladeRadius: 0,
+  bladeInterval: 0,
+  bladeDamage: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
   critChance: 0,
@@ -148,6 +158,7 @@ function describeModuleLevel(stats: ModuleLevelStats): string {
   if (stats.flareInterval !== undefined) return `${stats.flareInterval}秒ごとに追尾弾を発射(威力${stats.flareDamage})`;
   if (stats.strikeInterval !== undefined) return `${stats.strikeInterval}秒ごとに最もHPの高い敵を爆撃(威力${stats.strikeDamage})`;
   if (stats.laserDamagePerSecond !== undefined) return `貫通レーザー(秒間${stats.laserDamagePerSecond}ダメージ)。触れた敵弾も防ぐ`;
+  if (stats.bladeInterval !== undefined) return `${stats.bladeInterval}秒ごとに至近の敵を薙ぐ(威力${stats.bladeDamage})`;
   return `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
 }
 
@@ -257,6 +268,9 @@ export class BuildSystem {
     let strikeDamage = 0;
     let laserHalfWidth = 0;
     let laserDamagePerSecond = 0;
+    let bladeRadius = 0;
+    let bladeInterval = 0;
+    let bladeDamage = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -281,6 +295,11 @@ export class BuildSystem {
         laserDamagePerSecond = stats.laserDamagePerSecond;
         laserHalfWidth = stats.laserHalfWidth ?? 0;
       }
+      if (stats.bladeInterval !== undefined) {
+        bladeInterval = stats.bladeInterval;
+        bladeRadius = stats.bladeRadius ?? 0;
+        bladeDamage = stats.bladeDamage ?? 0;
+      }
     }
 
     this.modifiers = {
@@ -304,6 +323,9 @@ export class BuildSystem {
       strikeDamage,
       laserHalfWidth,
       laserDamagePerSecond,
+      bladeRadius,
+      bladeInterval,
+      bladeDamage,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
       critChance: critChanceBonusPct / 100,

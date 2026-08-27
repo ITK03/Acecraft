@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laserのみここに収録している。残り7種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_bladeのみここに収録している。残り6種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -53,6 +53,17 @@
       { "laserHalfWidth": 35, "laserDamagePerSecond": 20 },
       { "laserHalfWidth": 42, "laserDamagePerSecond": 32 },
       { "laserHalfWidth": 50, "laserDamagePerSecond": 48 }
+    ]
+  },
+  "mod_blade": {
+    "name": "ウイングブレード",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["melee"],
+    "levels": [
+      { "bladeInterval": 1.8, "bladeRadius": 90, "bladeDamage": 18 },
+      { "bladeInterval": 1.5, "bladeRadius": 105, "bladeDamage": 24 },
+      { "bladeInterval": 1.2, "bladeRadius": 120, "bladeDamage": 32 }
     ]
   }
 }

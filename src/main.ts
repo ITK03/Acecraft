@@ -26,6 +26,7 @@ import { OrbitField } from './game/OrbitField';
 import { HomingFlare } from './game/HomingFlare';
 import { PinpointStrike } from './game/PinpointStrike';
 import { LaserBeam } from './game/LaserBeam';
+import { WingBlade } from './game/WingBlade';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -133,6 +134,8 @@ async function bootstrap(): Promise<void> {
   const pinpointStrike = new PinpointStrike();
   // Phase 1: mod_laser(ピアッシングレーザー)。未所持(damagePerSecond<=0)の間は何もしない。
   const laserBeam = new LaserBeam();
+  // Phase 1: mod_blade(ウイングブレード)。未所持(interval<=0)の間は発動しない。
+  const wingBlade = new WingBlade();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -192,6 +195,13 @@ async function bootstrap(): Promise<void> {
     laserBeam.applyLoadout({
       halfWidth: modifiers.laserHalfWidth,
       damagePerSecond: modifiers.laserDamagePerSecond * (1 + modifiers.critChance * (balance.player.critDamageMultiplier - 1)),
+    });
+    wingBlade.applyLoadout({
+      interval: modifiers.bladeInterval,
+      radius: modifiers.bladeRadius,
+      damage: modifiers.bladeDamage,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
     });
     drainField.applyRadiusMultiplier(modifiers.drainRadiusMultiplier);
   };
@@ -293,6 +303,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(orbitField.view);
   world.addChild(pinpointStrike.view);
   world.addChild(laserBeam.view);
+  world.addChild(wingBlade.view);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
@@ -390,6 +401,7 @@ async function bootstrap(): Promise<void> {
       orbitField.update(dt, craft.x, craft.y, bulletSystem);
       pinpointStrike.update(dt, craft.state, enemySystem);
       laserBeam.update(dt, craft.state, craft.x, craft.y, enemySystem, bulletSystem);
+      wingBlade.update(dt, craft.state, craft.x, craft.y, enemySystem);
 
       // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
       // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。
