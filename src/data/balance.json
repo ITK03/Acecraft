@@ -1,9 +1,8 @@
 {
   "_comment": "02_CORE_SPEC.md の [設計値] を集約する。T2以降のタスクで随時値を追加する。",
   "craft": {
-    "_followLerpComment": "ユーザーフィードバック「動かした時に慣性というか滑るというかを無くして欲しい」。0.5だと毎ステップ半分だけ追いつく=指を止めた後も数フレーム滑るように見えていたため、ほぼ即時追従(1.0)にした。",
+    "_followLerpComment": "ユーザーフィードバック「動かした時に慣性というか滑るというかを無くして欲しい」。0.5だと毎ステップ半分だけ追いつく=指を止めた後も数フレーム滑るように見えていたため、ほぼ即時追従(1.0)にした。DRAINへの移行時に速度を持ち越して滑らせる仕様も同じ理由で廃止した(driftDampingは廃止につき削除)。",
     "followLerp": 1.0,
-    "driftDamping": 0.85,
     "hitRadius": { "casual": 8, "normal": 6, "ace": 5 },
     "_dragSensitivityComment": "ユーザーフィードバック「動かした以上に動く感じを無くして欲しい」。前回1.8まで上げたが「動かした以上に動く」という逆方向のフィードバックが来たため、指の移動量=機体の移動量の1:1に戻した。",
     "dragSensitivity": 1.0
@@ -31,8 +30,7 @@
     "scale": 0.08,
     "hitStopSeconds": 0.06,
     "particleFlightSeconds": 0.35,
-    "_streamComment": "ユーザーフィードバック「ワンタップで全部出るんじゃなくて長押ししてると溜めたカウンターが少しずつ出る感じで」。指を離すか撃ち切るまでCOUNTER状態(無敵)が続き、streamIntervalSecondsごとに1発ずつ発射する。旧counter.durationは廃止(無敵時間=ストリームが続いている間、に置き換わったため)。",
-    "streamIntervalSeconds": 0.05,
+    "_streamComment": "ユーザーフィードバック「ワンタップで全部出るんじゃなくて長押ししてると溜めたカウンターが少しずつ出る感じで」「通常弾と同じペースで一発ずつ打ってほしい」。指を離すか撃ち切るまでCOUNTER状態(無敵)が続き、main.ts側でmainGun.fireIntervalと同じ間隔で1発ずつ発射する(Craft.CraftConfig.counterStreamInterval)。旧counter.durationは廃止(無敵時間=ストリームが続いている間、に置き換わったため)。指を離した時点の残りchargeは破棄せず次のCOUNTERへ持ち越す。",
     "bulletSpeed": 1200,
     "spreadDeg": 100,
     "_homingComment": "速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。420度/秒は強すぎて至近距離で目標の周りをクルクル回り続ける不具合(ユーザーフィードバック)が出たため220まで落とし、homingMinDistance未満まで近づいたら追尾自体を切って直進させるようにした(それ以上曲げる必要がないほど近いため)。",

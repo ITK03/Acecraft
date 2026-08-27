@@ -12,7 +12,9 @@
  * 溜めたカウンターが少しずつ出る感じで」):
  *   COUNTER中は streamIntervalSeconds ごとに charge を1減らしながら1発ずつ発射する
  *   (onCounterBulletFire を都度呼ぶ)。charge が自然に0になるか、指を離した瞬間に
- *   終了する(離した時点で残弾は破棄。02_CORE_SPEC.md §3.4「発動後 charge=0」に対応)。
+ *   終了する。指を離した時点で charge が残っていても破棄しない(ユーザーフィードバック
+ *   「3発分カウンター溜まってて1回しか撃たなかったら次の長押しで2発分打てるように」)。
+ *   残った charge はそのままDRAINへ持ち越され、次にタップした瞬間また続きから発射される。
  *   charge の減り方=チャージリングの縮み方になるので、撃ち尽くしていく様子がそのまま見える。
  *
  * T2 時点では吸収システム(T4)もカウンター実処理(T5)も未実装のため charge は常に 0 であり、
@@ -40,7 +42,6 @@ export interface CraftBounds {
 
 export interface CraftConfig {
   followLerp: number;
-  driftDamping: number;
   hitRadius: number;
   /** COUNTER中、charge を1減らして1発発射するまでの間隔(秒) */
   counterStreamInterval: number;
@@ -70,14 +71,6 @@ export class Craft {
   private dragAnchorCraftX = 0;
   private dragAnchorCraftY = 0;
 
-  /** MOVE/COUNTER 中の実測速度。DRAIN へ落ちる瞬間にこれを初速として引き継ぐ */
-  private trackedVx = 0;
-  private trackedVy = 0;
-
-  /** DRAIN 中に減衰していく速度そのもの */
-  private vx = 0;
-  private vy = 0;
-
   /** COUNTER中、次の1発までの残り時間 */
   private counterFireTimer = 0;
   private wasTouching = false;
@@ -101,18 +94,12 @@ export class Craft {
   update(dt: number, input: CraftInput): void {
     this.handleEdgeTransitions(input);
 
-    const prevX = this.x;
-    const prevY = this.y;
-
     if (this.state === 'MOVE' || this.state === 'COUNTER') {
       const targetX = this.dragAnchorCraftX + (input.fingerX - this.dragAnchorFingerX) * this.config.dragSensitivity;
       const targetY = this.dragAnchorCraftY + (input.fingerY - this.dragAnchorFingerY) * this.config.dragSensitivity;
       this.x += (targetX - this.x) * this.config.followLerp;
       this.y += (targetY - this.y) * this.config.followLerp;
       this.clampToBounds();
-
-      this.trackedVx = (this.x - prevX) / dt;
-      this.trackedVy = (this.y - prevY) / dt;
 
       if (this.state === 'COUNTER') {
         this.counterFireTimer -= dt;
@@ -122,7 +109,7 @@ export class Craft {
           this.onCounterBulletFire?.();
         }
         if (this.charge <= 0 || !input.isTouching) {
-          this.charge = 0; // 指を離した時点の残弾は破棄する(発動後charge=0、02_CORE_SPEC.md §3.4)
+          // 指を離した時点で charge が残っていても破棄しない(次のCOUNTERへ持ち越す)
           if (input.isTouching) {
             this.enterMove(input.fingerX, input.fingerY);
           } else {
@@ -130,14 +117,10 @@ export class Craft {
           }
         }
       }
-    } else {
-      // DRAIN: 入力を受け付けず、直前の速度を減衰させながら滑って止まる
-      this.x += this.vx * dt;
-      this.y += this.vy * dt;
-      this.vx *= this.config.driftDamping;
-      this.vy *= this.config.driftDamping;
-      this.clampToBounds();
     }
+    // DRAIN: 指を離した瞬間にその場で完全に停止する(ユーザーフィードバック
+    // 「スライドしたまま指を離すと滑る、普通に止まっててほしい」により慣性を廃止した)。
+    // 位置は変えないため、ここでは何もしない。
 
     this.wasTouching = input.isTouching;
   }
@@ -174,10 +157,6 @@ export class Craft {
     this.x = x;
     this.y = y;
     this.charge = 0;
-    this.vx = 0;
-    this.vy = 0;
-    this.trackedVx = 0;
-    this.trackedVy = 0;
     this.counterFireTimer = 0;
     if (input.isTouching) {
       this.enterMove(input.fingerX, input.fingerY);
@@ -197,8 +176,6 @@ export class Craft {
 
   private enterDrain(): void {
     this.state = 'DRAIN';
-    this.vx = this.trackedVx;
-    this.vy = this.trackedVy;
   }
 
   private clampToBounds(): void {

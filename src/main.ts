@@ -99,9 +99,10 @@ async function bootstrap(): Promise<void> {
   const craft = new Craft(
     {
       followLerp: balance.craft.followLerp,
-      driftDamping: balance.craft.driftDamping,
       hitRadius: balance.craft.hitRadius.normal,
-      counterStreamInterval: balance.counter.streamIntervalSeconds,
+      // ユーザーフィードバック「通常弾と同じペースで一発ずつ打ってほしい」により、
+      // カウンターのストリーム間隔を主砲の連射間隔とそのまま一致させる。
+      counterStreamInterval: balance.mainGun.fireInterval,
       bounds: CRAFT_MOVE_BOUNDS,
       dragSensitivity: balance.craft.dragSensitivity,
     },
