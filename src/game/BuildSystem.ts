@@ -22,6 +22,8 @@ interface ModuleLevelStats {
   flareTurnRateRad?: number;
   strikeInterval?: number;
   strikeDamage?: number;
+  laserHalfWidth?: number;
+  laserDamagePerSecond?: number;
 }
 interface ModuleDef {
   name: string;
@@ -87,6 +89,9 @@ export interface StatModifiers {
   /** mod_strike_s(ピンポイントストライク)。interval<=0で未所持扱い、PinpointStrike側は何もしない */
   strikeInterval: number;
   strikeDamage: number;
+  /** mod_laser(ピアッシングレーザー)。damagePerSecond<=0で未所持扱い、LaserBeam側は何もしない */
+  laserHalfWidth: number;
+  laserDamagePerSecond: number;
   /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
@@ -113,6 +118,8 @@ const BASE_MODIFIERS: StatModifiers = {
   flareTurnRateRad: 0,
   strikeInterval: 0,
   strikeDamage: 0,
+  laserHalfWidth: 0,
+  laserDamagePerSecond: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
   critChance: 0,
@@ -134,6 +141,14 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.homingTurnRateBonusPct !== undefined) return `追尾性能 +${stats.homingTurnRateBonusPct}%`;
   if (stats.critChanceBonusPct !== undefined) return `クリティカル率 +${stats.critChanceBonusPct}%`;
   return '';
+}
+
+function describeModuleLevel(stats: ModuleLevelStats): string {
+  if (stats.orbitCount !== undefined) return `周回コア${stats.orbitCount}機。触れた敵弾を防ぐ`;
+  if (stats.flareInterval !== undefined) return `${stats.flareInterval}秒ごとに追尾弾を発射(威力${stats.flareDamage})`;
+  if (stats.strikeInterval !== undefined) return `${stats.strikeInterval}秒ごとに最もHPの高い敵を爆撃(威力${stats.strikeDamage})`;
+  if (stats.laserDamagePerSecond !== undefined) return `貫通レーザー(秒間${stats.laserDamagePerSecond}ダメージ)。触れた敵弾も防ぐ`;
+  return `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
 }
 
 export class BuildSystem {
@@ -188,15 +203,7 @@ export class BuildSystem {
       const def = modules[id];
       const nextLevel = (this.moduleLevels.get(id) ?? 0) + 1;
       const stats = def.levels[nextLevel - 1];
-      const description =
-        stats.orbitCount !== undefined
-          ? `周回コア${stats.orbitCount}機。触れた敵弾を防ぐ`
-          : stats.flareInterval !== undefined
-            ? `${stats.flareInterval}秒ごとに追尾弾を発射(威力${stats.flareDamage})`
-            : stats.strikeInterval !== undefined
-              ? `${stats.strikeInterval}秒ごとに最もHPの高い敵を爆撃(威力${stats.strikeDamage})`
-              : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
-      return { kind, id, name: def.name, level: nextLevel, description };
+      return { kind, id, name: def.name, level: nextLevel, description: describeModuleLevel(stats) };
     }
     const def = chips[id];
     const nextLevel = (this.chipLevels.get(id) ?? 0) + 1;
@@ -248,6 +255,8 @@ export class BuildSystem {
     let flareTurnRateRad = 0;
     let strikeInterval = 0;
     let strikeDamage = 0;
+    let laserHalfWidth = 0;
+    let laserDamagePerSecond = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -267,6 +276,10 @@ export class BuildSystem {
       if (stats.strikeInterval !== undefined) {
         strikeInterval = stats.strikeInterval;
         strikeDamage = stats.strikeDamage ?? 0;
+      }
+      if (stats.laserDamagePerSecond !== undefined) {
+        laserDamagePerSecond = stats.laserDamagePerSecond;
+        laserHalfWidth = stats.laserHalfWidth ?? 0;
       }
     }
 
@@ -289,6 +302,8 @@ export class BuildSystem {
       flareTurnRateRad,
       strikeInterval,
       strikeDamage,
+      laserHalfWidth,
+      laserDamagePerSecond,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
       critChance: critChanceBonusPct / 100,

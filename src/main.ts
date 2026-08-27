@@ -25,6 +25,7 @@ import { LevelUpModal } from './ui/LevelUpModal';
 import { OrbitField } from './game/OrbitField';
 import { HomingFlare } from './game/HomingFlare';
 import { PinpointStrike } from './game/PinpointStrike';
+import { LaserBeam } from './game/LaserBeam';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -130,6 +131,8 @@ async function bootstrap(): Promise<void> {
   const homingFlare = new HomingFlare();
   // Phase 1: mod_strike_s(ピンポイントストライク)。未所持(interval<=0)の間は発動しない。
   const pinpointStrike = new PinpointStrike();
+  // Phase 1: mod_laser(ピアッシングレーザー)。未所持(damagePerSecond<=0)の間は何もしない。
+  const laserBeam = new LaserBeam();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -184,6 +187,11 @@ async function bootstrap(): Promise<void> {
       damage: modifiers.strikeDamage,
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    // chip_targeting: 継続ダメージのため個々の発射でのランダム判定ではなく、期待値をそのままdpsへ織り込む。
+    laserBeam.applyLoadout({
+      halfWidth: modifiers.laserHalfWidth,
+      damagePerSecond: modifiers.laserDamagePerSecond * (1 + modifiers.critChance * (balance.player.critDamageMultiplier - 1)),
     });
     drainField.applyRadiusMultiplier(modifiers.drainRadiusMultiplier);
   };
@@ -284,6 +292,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(craftView);
   world.addChild(orbitField.view);
   world.addChild(pinpointStrike.view);
+  world.addChild(laserBeam.view);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
@@ -380,6 +389,7 @@ async function bootstrap(): Promise<void> {
       // (このフレームでブロックされた弾はクラフト側の判定に含めない)。
       orbitField.update(dt, craft.x, craft.y, bulletSystem);
       pinpointStrike.update(dt, craft.state, enemySystem);
+      laserBeam.update(dt, craft.state, craft.x, craft.y, enemySystem, bulletSystem);
 
       // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
       // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。

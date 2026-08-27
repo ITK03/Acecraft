@@ -80,6 +80,7 @@ const SPAWN_CYCLE: readonly EnemyTypeId[] = ['grunt', 'grunt', 'seeker', 'brawle
 const ENEMY_COLORS: Record<EnemyTypeId, number> = { grunt: 0x6fbf6f, seeker: 0xbfbf5f, brawler: 0x9f5a3f };
 const MAX_HIT_RADIUS = Math.max(...ENEMY_TYPE_IDS.map((id) => defs[id].hitRadius));
 const CONTACT_HIT_CAPACITY = 8;
+const BEAM_HIT_CAPACITY = 24;
 
 function makeEnemy(): Enemy {
   return { active: false, typeId: 'grunt', x: 0, y: 0, baseX: 0, age: 0, hp: 0, maxHp: 0, fireCooldown: 0 };
@@ -110,6 +111,8 @@ export class EnemySystem {
   private readonly hitDamageScratch: Float32Array;
   // resolveContactWithCraft用の同種スクラッチ(接触した敵を先に集めてから走査後にkillEnemyする)
   private readonly contactHitScratch = new Int32Array(CONTACT_HIT_CAPACITY);
+  // applyBeamDamage(mod_laser)用の同種スクラッチ(範囲内の敵を先に集めてから走査後にダメージ適用する)
+  private readonly beamHitScratch = new Int32Array(BEAM_HIT_CAPACITY);
 
   private readonly effectPool = new Pool<EffectParticle>(EFFECT_CAPACITY, makeEffect);
   private readonly effectGraphics: Graphics[] = [];
@@ -337,6 +340,24 @@ export class EnemySystem {
     if (!enemy.active) return; // 同フレームで既に別の攻撃に倒されている場合はスキップ
     enemy.hp -= damage;
     if (enemy.hp <= 0) this.killEnemy(index);
+  }
+
+  /**
+   * mod_laser用。x∈[minX,maxX] かつ y<maxY(自機より上方向)にいるアクティブな敵全員へ
+   * damageを与える(貫通ビームなので命中数に制限はない)。killEnemy(pool.release)を
+   * 同じPoolのforEachActive走査中に呼べないため、対象を先に集めてから走査後にまとめて処理する。
+   */
+  applyBeamDamage(minX: number, maxX: number, maxY: number, damage: number): void {
+    let hitCount = 0;
+    this.pool.forEachActive((enemy, index) => {
+      if (hitCount >= this.beamHitScratch.length) return;
+      if (enemy.x < minX || enemy.x > maxX || enemy.y > maxY) return;
+      this.beamHitScratch[hitCount] = index;
+      hitCount += 1;
+    });
+    for (let i = 0; i < hitCount; i += 1) {
+      this.applyDirectDamage(this.beamHitScratch[i], damage);
+    }
   }
 
   private rebuildGrid(): void {

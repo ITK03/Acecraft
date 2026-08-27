@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_sのみここに収録している。残り8種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laserのみここに収録している。残り7種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -42,6 +42,17 @@
       { "strikeInterval": 2.5, "strikeDamage": 40 },
       { "strikeInterval": 2.2, "strikeDamage": 55 },
       { "strikeInterval": 1.8, "strikeDamage": 75 }
+    ]
+  },
+  "mod_laser": {
+    "name": "ピアッシングレーザー",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["single"],
+    "levels": [
+      { "laserHalfWidth": 35, "laserDamagePerSecond": 20 },
+      { "laserHalfWidth": 42, "laserDamagePerSecond": 32 },
+      { "laserHalfWidth": 50, "laserDamagePerSecond": 48 }
     ]
   }
 }
