@@ -312,6 +312,33 @@ export class EnemySystem {
     return found;
   }
 
+  /**
+   * mod_strike_s(ピンポイントストライク)用。画面内でHPが最も高いアクティブな敵のpool indexを
+   * 返し(いなければ-1)、その座標をoutへ書き込む(演出用。毎フレーム呼ばれる想定ではないため
+   * findNearestActiveEnemyほど神経質にアロケーションを避ける必要はないが、同じout方式に揃える)。
+   */
+  findHighestHpActiveEnemy(out: { x: number; y: number }): number {
+    let bestIndex = -1;
+    let bestHp = -Infinity;
+    this.pool.forEachActive((enemy, index) => {
+      if (enemy.hp > bestHp) {
+        bestHp = enemy.hp;
+        bestIndex = index;
+        out.x = enemy.x;
+        out.y = enemy.y;
+      }
+    });
+    return bestIndex;
+  }
+
+  /** mod_strike_s用。指定した敵へ直接ダメージを与える(弾を介さない単発ダメージ) */
+  applyDirectDamage(index: number, damage: number): void {
+    const enemy = this.pool.get(index);
+    if (!enemy.active) return; // 同フレームで既に別の攻撃に倒されている場合はスキップ
+    enemy.hp -= damage;
+    if (enemy.hp <= 0) this.killEnemy(index);
+  }
+
   private rebuildGrid(): void {
     let count = 0;
     this.pool.forEachActive((enemy, index) => {

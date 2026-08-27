@@ -24,6 +24,7 @@ import { BuildSystem, type StatModifiers, type PickChoice } from './game/BuildSy
 import { LevelUpModal } from './ui/LevelUpModal';
 import { OrbitField } from './game/OrbitField';
 import { HomingFlare } from './game/HomingFlare';
+import { PinpointStrike } from './game/PinpointStrike';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -125,6 +126,8 @@ async function bootstrap(): Promise<void> {
   const orbitField = new OrbitField();
   // Phase 1: mod_homingflare(ホーミングフレア)。未所持(interval<=0)の間は発射しない。
   const homingFlare = new HomingFlare();
+  // Phase 1: mod_strike_s(ピンポイントストライク)。未所持(interval<=0)の間は発動しない。
+  const pinpointStrike = new PinpointStrike();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -168,6 +171,7 @@ async function bootstrap(): Promise<void> {
     mainGun.applyLoadout(computeMainGunConfig(modifiers));
     orbitField.applyLoadout(modifiers.orbitCount, modifiers.orbitBlockRadius, modifiers.orbitRadius, modifiers.orbitSpeedRad);
     homingFlare.applyLoadout({ interval: modifiers.flareInterval, damage: modifiers.flareDamage, speed: modifiers.flareSpeed });
+    pinpointStrike.applyLoadout({ interval: modifiers.strikeInterval, damage: modifiers.strikeDamage });
     drainField.applyRadiusMultiplier(modifiers.drainRadiusMultiplier);
   };
 
@@ -263,6 +267,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(drainField.view);
   world.addChild(craftView);
   world.addChild(orbitField.view);
+  world.addChild(pinpointStrike.view);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
@@ -358,6 +363,7 @@ async function bootstrap(): Promise<void> {
       // mod_orbitのブロック判定は、素通りした弾がクラフトに当たる判定より先に解決する
       // (このフレームでブロックされた弾はクラフト側の判定に含めない)。
       orbitField.update(dt, craft.x, craft.y, bulletSystem);
+      pinpointStrike.update(dt, craft.state, enemySystem);
 
       // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
       // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。

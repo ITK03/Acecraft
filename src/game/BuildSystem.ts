@@ -20,6 +20,8 @@ interface ModuleLevelStats {
   flareDamage?: number;
   flareSpeed?: number;
   flareTurnRateRad?: number;
+  strikeInterval?: number;
+  strikeDamage?: number;
 }
 interface ModuleDef {
   name: string;
@@ -81,6 +83,9 @@ export interface StatModifiers {
   flareDamage: number;
   flareSpeed: number;
   flareTurnRateRad: number;
+  /** mod_strike_s(ピンポイントストライク)。interval<=0で未所持扱い、PinpointStrike側は何もしない */
+  strikeInterval: number;
+  strikeDamage: number;
   /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
@@ -103,6 +108,8 @@ const BASE_MODIFIERS: StatModifiers = {
   flareDamage: 0,
   flareSpeed: 0,
   flareTurnRateRad: 0,
+  strikeInterval: 0,
+  strikeDamage: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
 };
@@ -181,7 +188,9 @@ export class BuildSystem {
           ? `周回コア${stats.orbitCount}機。触れた敵弾を防ぐ`
           : stats.flareInterval !== undefined
             ? `${stats.flareInterval}秒ごとに追尾弾を発射(威力${stats.flareDamage})`
-            : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
+            : stats.strikeInterval !== undefined
+              ? `${stats.strikeInterval}秒ごとに最もHPの高い敵を爆撃(威力${stats.strikeDamage})`
+              : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
       return { kind, id, name: def.name, level: nextLevel, description };
     }
     const def = chips[id];
@@ -230,6 +239,8 @@ export class BuildSystem {
     let flareDamage = 0;
     let flareSpeed = 0;
     let flareTurnRateRad = 0;
+    let strikeInterval = 0;
+    let strikeDamage = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -245,6 +256,10 @@ export class BuildSystem {
         flareDamage = stats.flareDamage ?? 0;
         flareSpeed = stats.flareSpeed ?? 0;
         flareTurnRateRad = stats.flareTurnRateRad ?? 0;
+      }
+      if (stats.strikeInterval !== undefined) {
+        strikeInterval = stats.strikeInterval;
+        strikeDamage = stats.strikeDamage ?? 0;
       }
     }
 
@@ -265,6 +280,8 @@ export class BuildSystem {
       flareDamage,
       flareSpeed,
       flareTurnRateRad,
+      strikeInterval,
+      strikeDamage,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
     };
