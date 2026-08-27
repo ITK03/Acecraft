@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spreadのみここに収録している。残り11種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbitのみここに収録している。残り10種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -9,6 +9,17 @@
       { "bulletCountBonus": 1, "spreadBonusDeg": 8 },
       { "bulletCountBonus": 2, "spreadBonusDeg": 16 },
       { "bulletCountBonus": 3, "spreadBonusDeg": 24 }
+    ]
+  },
+  "mod_orbit": {
+    "name": "オービットコア",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["orbit"],
+    "levels": [
+      { "orbitCount": 1, "orbitBlockRadius": 18, "orbitRadius": 55, "orbitSpeedRad": 2.2 },
+      { "orbitCount": 2, "orbitBlockRadius": 20, "orbitRadius": 60, "orbitSpeedRad": 2.4 },
+      { "orbitCount": 3, "orbitBlockRadius": 24, "orbitRadius": 65, "orbitSpeedRad": 2.6 }
     ]
   }
 }

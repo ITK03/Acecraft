@@ -22,6 +22,7 @@ import { BackgroundToggle } from './ui/BackgroundToggle';
 import { LootSystem } from './game/LootSystem';
 import { BuildSystem, type StatModifiers, type PickChoice } from './game/BuildSystem';
 import { LevelUpModal } from './ui/LevelUpModal';
+import { OrbitField } from './game/OrbitField';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -119,6 +120,8 @@ async function bootstrap(): Promise<void> {
   const bulletSystem = new BulletSystem(app.renderer);
   const mainGun = new MainGun(computeMainGunConfig(buildSystem.modifiers));
   const enemySystem = new EnemySystem();
+  // Phase 1: mod_orbit(オービットコア)。未所持(orbitCount===0)の間は描画も判定も何もしない受動的なビュー。
+  const orbitField = new OrbitField();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -160,6 +163,7 @@ async function bootstrap(): Promise<void> {
   };
   buildSystem.onModifiersChanged = (modifiers) => {
     mainGun.applyLoadout(computeMainGunConfig(modifiers));
+    orbitField.applyLoadout(modifiers.orbitCount, modifiers.orbitBlockRadius, modifiers.orbitRadius, modifiers.orbitSpeedRad);
   };
 
   // ヒットストップと画面フラッシュの状態(カウンター発動で駆動)。
@@ -253,6 +257,7 @@ async function bootstrap(): Promise<void> {
   world.addChild(lootSystem.view);
   world.addChild(drainField.view);
   world.addChild(craftView);
+  world.addChild(orbitField.view);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
@@ -336,6 +341,9 @@ async function bootstrap(): Promise<void> {
       bulletSystem.steerCounterBullets(dt, homingTurnRateRad, balance.counter.homingMinDistance, findCounterBulletTarget);
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       enemySystem.update(dt, craft.x, craft.y, bulletSystem);
+      // mod_orbitのブロック判定は、素通りした弾がクラフトに当たる判定より先に解決する
+      // (このフレームでブロックされた弾はクラフト側の判定に含めない)。
+      orbitField.update(dt, craft.x, craft.y, bulletSystem);
 
       // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
       // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。

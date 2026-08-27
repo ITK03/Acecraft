@@ -10,8 +10,12 @@ import chipsData from '../data/chips.json';
  */
 
 interface ModuleLevelStats {
-  bulletCountBonus: number;
-  spreadBonusDeg: number;
+  bulletCountBonus?: number;
+  spreadBonusDeg?: number;
+  orbitCount?: number;
+  orbitBlockRadius?: number;
+  orbitRadius?: number;
+  orbitSpeedRad?: number;
 }
 interface ModuleDef {
   name: string;
@@ -61,6 +65,11 @@ export interface StatModifiers {
   healMultiplier: number;
   bulletCountBonus: number;
   spreadBonusDeg: number;
+  /** mod_orbit(オービットコア)。未所持なら0で、OrbitField側は何もしない */
+  orbitCount: number;
+  orbitBlockRadius: number;
+  orbitRadius: number;
+  orbitSpeedRad: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -71,6 +80,10 @@ const BASE_MODIFIERS: StatModifiers = {
   healMultiplier: 1,
   bulletCountBonus: 0,
   spreadBonusDeg: 0,
+  orbitCount: 0,
+  orbitBlockRadius: 0,
+  orbitRadius: 0,
+  orbitSpeedRad: 0,
 };
 
 interface Candidate {
@@ -140,13 +153,11 @@ export class BuildSystem {
       const def = modules[id];
       const nextLevel = (this.moduleLevels.get(id) ?? 0) + 1;
       const stats = def.levels[nextLevel - 1];
-      return {
-        kind,
-        id,
-        name: def.name,
-        level: nextLevel,
-        description: `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`,
-      };
+      const description =
+        stats.orbitCount !== undefined
+          ? `周回コア${stats.orbitCount}機。触れた敵弾を防ぐ`
+          : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
+      return { kind, id, name: def.name, level: nextLevel, description };
     }
     const def = chips[id];
     const nextLevel = (this.chipLevels.get(id) ?? 0) + 1;
@@ -177,12 +188,25 @@ export class BuildSystem {
       healBonusPct += stats.healBonusPct ?? 0;
     }
 
+    // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
+    // 足し合わせる(=複数の攻撃系モジュールを持てば加算されていく)。一方orbit系は「所持していれば
+    // その値をそのまま使う」性質の値なので、足し合わせず所持モジュールの値をそのまま反映する。
     let bulletCountBonus = 0;
     let spreadBonusDeg = 0;
+    let orbitCount = 0;
+    let orbitBlockRadius = 0;
+    let orbitRadius = 0;
+    let orbitSpeedRad = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
-      bulletCountBonus += stats.bulletCountBonus;
-      spreadBonusDeg += stats.spreadBonusDeg;
+      bulletCountBonus += stats.bulletCountBonus ?? 0;
+      spreadBonusDeg += stats.spreadBonusDeg ?? 0;
+      if (stats.orbitCount !== undefined) {
+        orbitCount = stats.orbitCount;
+        orbitBlockRadius = stats.orbitBlockRadius ?? 0;
+        orbitRadius = stats.orbitRadius ?? 0;
+        orbitSpeedRad = stats.orbitSpeedRad ?? 0;
+      }
     }
 
     this.modifiers = {
@@ -194,6 +218,10 @@ export class BuildSystem {
       healMultiplier: 1 + healBonusPct / 100,
       bulletCountBonus,
       spreadBonusDeg,
+      orbitCount,
+      orbitBlockRadius,
+      orbitRadius,
+      orbitSpeedRad,
     };
     this.onModifiersChanged?.(this.modifiers);
   }
