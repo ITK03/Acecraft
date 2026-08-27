@@ -62,3 +62,12 @@ export const COUNTER_BULLET: BulletVisualConfig = {
   outlineColor: 0x1a1020,
   outlineWidth: 3,
 };
+
+// mod_homingflare(ホーミングフレア)の弾。既存の全弾(敵シアン/敵チャージ マゼンタ/自機弾 淡黄/
+// カウンター弾 白)と被らない色相として若草色を採用する。[設計値]
+export const FLARE_BULLET: BulletVisualConfig = {
+  radius: 9,
+  fillColor: 0x7dffb0,
+  outlineColor: 0x1a1020,
+  outlineWidth: 2,
+};

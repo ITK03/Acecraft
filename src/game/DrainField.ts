@@ -43,6 +43,8 @@ export class DrainField {
   private readonly config: DrainFieldConfig;
   private activeTime = 0;
   private wasActive = false;
+  // chip_gravity(ドレイン範囲+%)用。1.0=無補正。BuildSystem.onModifiersChangedから更新される。
+  private radiusMultiplier = 1;
 
   // update()内でPool.forEachActiveを回している最中に release すると密配列(スワップ削除)が
   // 壊れるため、吸収対象の添字(と、エフェクト表示用に消滅位置)を先に集めてから走査後にまとめて absorb する。
@@ -58,6 +60,15 @@ export class DrainField {
 
   /** T5: 弾を1発吸収するたびに呼ばれる。吸引音の再生などに使う */
   onAbsorb?: (newCharge: number) => void;
+
+  /** chip_gravity。BuildSystem.onModifiersChangedから毎回呼ぶ */
+  applyRadiusMultiplier(multiplier: number): void {
+    this.radiusMultiplier = multiplier;
+  }
+
+  private get effectiveRadius(): number {
+    return this.config.radius * this.radiusMultiplier;
+  }
 
   constructor(config: DrainFieldConfig, enemyChargeCapacity: number) {
     this.config = config;
@@ -108,7 +119,7 @@ export class DrainField {
         return;
       }
 
-      if (distSq > this.config.radius * this.config.radius) return;
+      if (distSq > this.effectiveRadius * this.effectiveRadius) return;
 
       const dist = Math.sqrt(distSq);
       // "up" = (0, -1) からの角度。dot((dx,dy)/dist, (0,-1)) = -dy/dist
@@ -178,7 +189,7 @@ export class DrainField {
     const points: number[] = [0, 0];
     for (let i = 0; i <= steps; i += 1) {
       const a = startAngle + ((endAngle - startAngle) * i) / steps;
-      points.push(Math.cos(a) * this.config.radius, Math.sin(a) * this.config.radius);
+      points.push(Math.cos(a) * this.effectiveRadius, Math.sin(a) * this.effectiveRadius);
     }
     this.coneGraphics
       .poly(points)

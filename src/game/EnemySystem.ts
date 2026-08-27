@@ -102,7 +102,8 @@ export class EnemySystem {
 
   // resolvePlayerBulletHits用: Pool.forEachActive の走査中に同じプールから release すると
   // 密配列(スワップ削除)が壊れるため、命中した弾の添字を先に集めてから走査後にまとめて消費する。
-  // 主砲弾/カウンター弾の2種を扱うため、どちらの弾プールから消費すべきかも記録しておく。
+  // 主砲弾/カウンター弾/フレア弾の3種を扱うため、どの弾プールから消費すべきかも記録しておく
+  // (0=player, 1=counter, 2=flare)。
   private readonly hitBulletScratch: Int32Array;
   private readonly hitBulletKindScratch: Uint8Array;
   private readonly hitEnemyScratch: Int32Array;
@@ -342,7 +343,7 @@ export class EnemySystem {
       });
       if (hitEnemyIndex === -1) return;
       this.hitBulletScratch[hitCount] = bulletIndex;
-      this.hitBulletKindScratch[hitCount] = kind === 'counter' ? 1 : 0;
+      this.hitBulletKindScratch[hitCount] = kind === 'counter' ? 1 : kind === 'flare' ? 2 : 0;
       this.hitEnemyScratch[hitCount] = hitEnemyIndex;
       this.hitDamageScratch[hitCount] = bullet.damage;
       hitCount += 1;
@@ -351,7 +352,8 @@ export class EnemySystem {
     for (let i = 0; i < hitCount; i += 1) {
       const enemyIndex = this.hitEnemyScratch[i];
       const enemy = this.pool.get(enemyIndex);
-      bulletSystem.consumeHit(this.hitBulletKindScratch[i] === 1 ? 'counter' : 'player', this.hitBulletScratch[i]);
+      const hitKind = this.hitBulletKindScratch[i] === 1 ? 'counter' : this.hitBulletKindScratch[i] === 2 ? 'flare' : 'player';
+      bulletSystem.consumeHit(hitKind, this.hitBulletScratch[i]);
       if (!enemy.active) continue; // 同フレームで既に別弾に倒されている場合はスキップ
       enemy.hp -= this.hitDamageScratch[i];
       if (enemy.hp <= 0) this.killEnemy(enemyIndex);

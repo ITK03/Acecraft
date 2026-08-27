@@ -16,6 +16,10 @@ interface ModuleLevelStats {
   orbitBlockRadius?: number;
   orbitRadius?: number;
   orbitSpeedRad?: number;
+  flareInterval?: number;
+  flareDamage?: number;
+  flareSpeed?: number;
+  flareTurnRateRad?: number;
 }
 interface ModuleDef {
   name: string;
@@ -31,6 +35,8 @@ interface ChipLevelStats {
   damageTakenReductionPct?: number;
   counterDamageBonusPct?: number;
   healBonusPct?: number;
+  drainRadiusBonusPct?: number;
+  homingTurnRateBonusPct?: number;
 }
 interface ChipDef {
   name: string;
@@ -70,6 +76,15 @@ export interface StatModifiers {
   orbitBlockRadius: number;
   orbitRadius: number;
   orbitSpeedRad: number;
+  /** mod_homingflare(ホーミングフレア)。interval<=0で未所持扱い、HomingFlare側は何もしない */
+  flareInterval: number;
+  flareDamage: number;
+  flareSpeed: number;
+  flareTurnRateRad: number;
+  /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
+  drainRadiusMultiplier: number;
+  /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
+  homingTurnRateMultiplier: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -84,6 +99,12 @@ const BASE_MODIFIERS: StatModifiers = {
   orbitBlockRadius: 0,
   orbitRadius: 0,
   orbitSpeedRad: 0,
+  flareInterval: 0,
+  flareDamage: 0,
+  flareSpeed: 0,
+  flareTurnRateRad: 0,
+  drainRadiusMultiplier: 1,
+  homingTurnRateMultiplier: 1,
 };
 
 interface Candidate {
@@ -98,6 +119,8 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.damageTakenReductionPct !== undefined) return `被ダメージ -${stats.damageTakenReductionPct}%`;
   if (stats.counterDamageBonusPct !== undefined) return `カウンター威力 +${stats.counterDamageBonusPct}%`;
   if (stats.healBonusPct !== undefined) return `回復量 +${stats.healBonusPct}%`;
+  if (stats.drainRadiusBonusPct !== undefined) return `ドレイン範囲 +${stats.drainRadiusBonusPct}%`;
+  if (stats.homingTurnRateBonusPct !== undefined) return `追尾性能 +${stats.homingTurnRateBonusPct}%`;
   return '';
 }
 
@@ -156,7 +179,9 @@ export class BuildSystem {
       const description =
         stats.orbitCount !== undefined
           ? `周回コア${stats.orbitCount}機。触れた敵弾を防ぐ`
-          : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
+          : stats.flareInterval !== undefined
+            ? `${stats.flareInterval}秒ごとに追尾弾を発射(威力${stats.flareDamage})`
+            : `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
       return { kind, id, name: def.name, level: nextLevel, description };
     }
     const def = chips[id];
@@ -179,6 +204,8 @@ export class BuildSystem {
     let damageTakenReductionPct = 0;
     let counterDamageBonusPct = 0;
     let healBonusPct = 0;
+    let drainRadiusBonusPct = 0;
+    let homingTurnRateBonusPct = 0;
     for (const [id, level] of this.chipLevels) {
       const stats = chips[id].levels[level - 1];
       atkBonusPct += stats.atkBonusPct ?? 0;
@@ -186,10 +213,12 @@ export class BuildSystem {
       damageTakenReductionPct += stats.damageTakenReductionPct ?? 0;
       counterDamageBonusPct += stats.counterDamageBonusPct ?? 0;
       healBonusPct += stats.healBonusPct ?? 0;
+      drainRadiusBonusPct += stats.drainRadiusBonusPct ?? 0;
+      homingTurnRateBonusPct += stats.homingTurnRateBonusPct ?? 0;
     }
 
     // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
-    // 足し合わせる(=複数の攻撃系モジュールを持てば加算されていく)。一方orbit系は「所持していれば
+    // 足し合わせる(=複数の攻撃系モジュールを持てば加算されていく)。一方orbit/flare系は「所持していれば
     // その値をそのまま使う」性質の値なので、足し合わせず所持モジュールの値をそのまま反映する。
     let bulletCountBonus = 0;
     let spreadBonusDeg = 0;
@@ -197,6 +226,10 @@ export class BuildSystem {
     let orbitBlockRadius = 0;
     let orbitRadius = 0;
     let orbitSpeedRad = 0;
+    let flareInterval = 0;
+    let flareDamage = 0;
+    let flareSpeed = 0;
+    let flareTurnRateRad = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -206,6 +239,12 @@ export class BuildSystem {
         orbitBlockRadius = stats.orbitBlockRadius ?? 0;
         orbitRadius = stats.orbitRadius ?? 0;
         orbitSpeedRad = stats.orbitSpeedRad ?? 0;
+      }
+      if (stats.flareInterval !== undefined) {
+        flareInterval = stats.flareInterval;
+        flareDamage = stats.flareDamage ?? 0;
+        flareSpeed = stats.flareSpeed ?? 0;
+        flareTurnRateRad = stats.flareTurnRateRad ?? 0;
       }
     }
 
@@ -222,6 +261,12 @@ export class BuildSystem {
       orbitBlockRadius,
       orbitRadius,
       orbitSpeedRad,
+      flareInterval,
+      flareDamage,
+      flareSpeed,
+      flareTurnRateRad,
+      drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
+      homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
     };
     this.onModifiersChanged?.(this.modifiers);
   }

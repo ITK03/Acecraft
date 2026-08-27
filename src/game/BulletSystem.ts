@@ -1,6 +1,6 @@
 import { Container, Particle, ParticleContainer, type Renderer } from 'pixi.js';
 import { Pool, type Poolable } from '../core/Pool';
-import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET, COUNTER_BULLET, type BulletVisualConfig } from './BulletTextures';
+import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET, COUNTER_BULLET, FLARE_BULLET, type BulletVisualConfig } from './BulletTextures';
 import balance from '../data/balance.json';
 
 /**
@@ -31,8 +31,8 @@ export interface Bullet extends Poolable {
   pierce: number;
 }
 
-export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter';
-const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter'];
+export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter' | 'flare';
+const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter', 'flare'];
 
 const OFFSCREEN_MARGIN = 120;
 // Particle を隠す(=解放中であることを示す)ためのパーキング座標。位置は dynamic property なので
@@ -72,12 +72,14 @@ export class BulletSystem {
       enemyCharge: this.makeEntry(renderer, enemyChargeCapacity(), ENEMY_CHARGE_BULLET, 'enemy'),
       player: this.makeEntry(renderer, balance.bullets.maxActivePlayerBullets, PLAYER_BULLET, 'player'),
       counter: this.makeEntry(renderer, balance.bullets.maxActiveCounterBullets, COUNTER_BULLET, 'player'),
+      flare: this.makeEntry(renderer, balance.bullets.maxActiveFlareBullets, FLARE_BULLET, 'player'),
     };
     this.view.addChild(
       this.entries.enemyNormal.container,
       this.entries.enemyCharge.container,
       this.entries.player.container,
       this.entries.counter.container,
+      this.entries.flare.container,
     );
   }
 
@@ -106,6 +108,11 @@ export class BulletSystem {
 
   spawnEnemyBullet(kind: 'enemyNormal' | 'enemyCharge', x: number, y: number, vx: number, vy: number, damage: number): void {
     this.spawn(kind, x, y, vx, vy, damage, kind === 'enemyCharge');
+  }
+
+  /** mod_homingflare用。発射直後は直進で、steerFlareBullets()が毎フレーム進行方向を曲げる */
+  spawnFlareBullet(x: number, y: number, vx: number, vy: number, damage: number): void {
+    this.spawn('flare', x, y, vx, vy, damage, false);
   }
 
   /**
@@ -140,9 +147,29 @@ export class BulletSystem {
     minDistance: number,
     findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean,
   ): void {
+    this.steerKind('counter', dt, turnRateRad, minDistance, findTarget);
+  }
+
+  /** mod_homingflare用。挙動はsteerCounterBulletsと同一で、対象弾プールがflareなだけ */
+  steerFlareBullets(
+    dt: number,
+    turnRateRad: number,
+    minDistance: number,
+    findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean,
+  ): void {
+    this.steerKind('flare', dt, turnRateRad, minDistance, findTarget);
+  }
+
+  private steerKind(
+    kind: BulletKind,
+    dt: number,
+    turnRateRad: number,
+    minDistance: number,
+    findTarget: (x: number, y: number, out: { x: number; y: number }) => boolean,
+  ): void {
     const target = this.steerTargetScratch;
     const minDistanceSq = minDistance * minDistance;
-    this.entries.counter.pool.forEachActive((bullet) => {
+    this.entries[kind].pool.forEachActive((bullet) => {
       if (!findTarget(bullet.x, bullet.y, target)) return;
       const dx = target.x - bullet.x;
       const dy = target.y - bullet.y;
@@ -257,10 +284,11 @@ export class BulletSystem {
     return count;
   }
 
-  /** 主砲弾とカウンター弾をまとめて走査する(どちらも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
-  forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: 'player' | 'counter', index: number) => void): void {
+  /** 主砲弾・カウンター弾・フレア弾をまとめて走査する(いずれも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
+  forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: 'player' | 'counter' | 'flare', index: number) => void): void {
     this.entries.player.pool.forEachActive((bullet, index) => fn(bullet, 'player', index));
     this.entries.counter.pool.forEachActive((bullet, index) => fn(bullet, 'counter', index));
+    this.entries.flare.pool.forEachActive((bullet, index) => fn(bullet, 'flare', index));
   }
 
   forEachActiveEnemyChargeBullet(fn: (bullet: Bullet, index: number) => void): void {

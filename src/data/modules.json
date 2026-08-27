@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbitのみここに収録している。残り10種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflareのみここに収録している。残り9種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -20,6 +20,17 @@
       { "orbitCount": 1, "orbitBlockRadius": 18, "orbitRadius": 55, "orbitSpeedRad": 2.2 },
       { "orbitCount": 2, "orbitBlockRadius": 20, "orbitRadius": 60, "orbitSpeedRad": 2.4 },
       { "orbitCount": 3, "orbitBlockRadius": 24, "orbitRadius": 65, "orbitSpeedRad": 2.6 }
+    ]
+  },
+  "mod_homingflare": {
+    "name": "ホーミングフレア",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 2,
+    "tags": ["homing"],
+    "levels": [
+      { "flareInterval": 1.2, "flareDamage": 8, "flareSpeed": 700, "flareTurnRateRad": 3.0 },
+      { "flareInterval": 1.0, "flareDamage": 10, "flareSpeed": 700, "flareTurnRateRad": 3.4 },
+      { "flareInterval": 0.8, "flareDamage": 12, "flareSpeed": 750, "flareTurnRateRad": 3.8 }
     ]
   }
 }

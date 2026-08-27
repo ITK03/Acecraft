@@ -23,6 +23,7 @@ import { LootSystem } from './game/LootSystem';
 import { BuildSystem, type StatModifiers, type PickChoice } from './game/BuildSystem';
 import { LevelUpModal } from './ui/LevelUpModal';
 import { OrbitField } from './game/OrbitField';
+import { HomingFlare } from './game/HomingFlare';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -122,6 +123,8 @@ async function bootstrap(): Promise<void> {
   const enemySystem = new EnemySystem();
   // Phase 1: mod_orbit(オービットコア)。未所持(orbitCount===0)の間は描画も判定も何もしない受動的なビュー。
   const orbitField = new OrbitField();
+  // Phase 1: mod_homingflare(ホーミングフレア)。未所持(interval<=0)の間は発射しない。
+  const homingFlare = new HomingFlare();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -164,6 +167,8 @@ async function bootstrap(): Promise<void> {
   buildSystem.onModifiersChanged = (modifiers) => {
     mainGun.applyLoadout(computeMainGunConfig(modifiers));
     orbitField.applyLoadout(modifiers.orbitCount, modifiers.orbitBlockRadius, modifiers.orbitRadius, modifiers.orbitSpeedRad);
+    homingFlare.applyLoadout({ interval: modifiers.flareInterval, damage: modifiers.flareDamage, speed: modifiers.flareSpeed });
+    drainField.applyRadiusMultiplier(modifiers.drainRadiusMultiplier);
   };
 
   // ヒットストップと画面フラッシュの状態(カウンター発動で駆動)。
@@ -335,10 +340,19 @@ async function bootstrap(): Promise<void> {
       craft.update(dt, craftInput);
       playerHealth.update(dt);
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
+      homingFlare.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
       drainField.update(dt, craft, bulletSystem);
-      // カウンター弾の追尾も同様に、移動計算(bulletSystem.update)より前に速度の向きを曲げる。
-      bulletSystem.steerCounterBullets(dt, homingTurnRateRad, balance.counter.homingMinDistance, findCounterBulletTarget);
+      // カウンター弾/フレア弾の追尾も同様に、移動計算(bulletSystem.update)より前に速度の向きを曲げる。
+      // chip_seeker(homingTurnRateMultiplier)は両方の旋回速度に等しく効かせる。
+      const homingMultiplier = buildSystem.modifiers.homingTurnRateMultiplier;
+      bulletSystem.steerCounterBullets(dt, homingTurnRateRad * homingMultiplier, balance.counter.homingMinDistance, findCounterBulletTarget);
+      bulletSystem.steerFlareBullets(
+        dt,
+        buildSystem.modifiers.flareTurnRateRad * homingMultiplier,
+        balance.counter.homingMinDistance,
+        findCounterBulletTarget,
+      );
       bulletSystem.update(dt, LOGICAL_WIDTH, LOGICAL_HEIGHT);
       enemySystem.update(dt, craft.x, craft.y, bulletSystem);
       // mod_orbitのブロック判定は、素通りした弾がクラフトに当たる判定より先に解決する

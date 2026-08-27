@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙しているが、Phase1着手分として既存システムへの倍率適用だけで完結する(新規サブシステム不要な)5種のみここに収録している。残り9種は未実装のため未収録(modules.jsonと同じ理由)。",
+  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙しているが、Phase1着手分として既存システムへの倍率適用だけで完結する(新規サブシステム不要な)7種のみここに収録している。残り7種は未実装のため未収録(modules.jsonと同じ理由)。",
   "chip_barrel": {
     "name": "バレル拡張",
     "maxLevel": 3,
@@ -29,5 +29,17 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "levels": [{ "healBonusPct": 100 }, { "healBonusPct": 200 }, { "healBonusPct": 350 }]
+  },
+  "chip_gravity": {
+    "name": "グラビティ",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "levels": [{ "drainRadiusBonusPct": 20 }, { "drainRadiusBonusPct": 40 }, { "drainRadiusBonusPct": 65 }]
+  },
+  "chip_seeker": {
+    "name": "シーカー",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 2,
+    "levels": [{ "homingTurnRateBonusPct": 25 }, { "homingTurnRateBonusPct": 50 }, { "homingTurnRateBonusPct": 80 }]
   }
 }
