@@ -8,10 +8,11 @@ import type { PickChoice } from '../game/BuildSystem';
  * 既存のtoLogical変換+pointerdownハンドラを再利用してヒット判定する、既存のリトライタップと同じ設計)。
  */
 
-const CARD_WIDTH = 200;
-const CARD_HEIGHT = 220;
+// ユーザーフィードバック「レベルアップの3択の文字が小さくて見づらい」によりカード・文字を拡大した。
+const CARD_WIDTH = 220;
+const CARD_HEIGHT = 280;
 const CARD_GAP = 20;
-const CARD_Y = 420;
+const CARD_Y = 400;
 
 interface CardRect {
   x: number;
@@ -35,11 +36,11 @@ export class LevelUpModal extends Container {
 
     const titleText = new Text({
       text: 'LEVEL UP!',
-      style: new TextStyle({ fill: '#ffe9a8', fontFamily: 'monospace', fontSize: 32, align: 'center' }),
+      style: new TextStyle({ fill: '#ffe9a8', fontFamily: 'monospace', fontSize: 40, align: 'center' }),
     });
     titleText.anchor.set(0.5);
     titleText.x = LOGICAL_WIDTH / 2;
-    titleText.y = 280;
+    titleText.y = 270;
     this.addChild(titleText);
 
     const totalWidth = CARD_WIDTH * 3 + CARD_GAP * 2;
@@ -52,30 +53,30 @@ export class LevelUpModal extends Container {
       this.addChild(g);
       this.cardGraphics.push(g);
 
-      const kindText = new Text({ text: '', style: new TextStyle({ fill: '#7fe8ff', fontFamily: 'monospace', fontSize: 13, align: 'center' }) });
+      const kindText = new Text({ text: '', style: new TextStyle({ fill: '#7fe8ff', fontFamily: 'monospace', fontSize: 17, align: 'center' }) });
       kindText.anchor.set(0.5, 0);
       kindText.x = x + CARD_WIDTH / 2;
-      kindText.y = CARD_Y + 16;
+      kindText.y = CARD_Y + 20;
       this.addChild(kindText);
       this.cardKindText.push(kindText);
 
       const nameText = new Text({
         text: '',
-        style: new TextStyle({ fill: '#ffffff', fontFamily: 'monospace', fontSize: 18, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 20 }),
+        style: new TextStyle({ fill: '#ffffff', fontFamily: 'monospace', fontSize: 26, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 20 }),
       });
       nameText.anchor.set(0.5, 0);
       nameText.x = x + CARD_WIDTH / 2;
-      nameText.y = CARD_Y + 44;
+      nameText.y = CARD_Y + 56;
       this.addChild(nameText);
       this.cardNameText.push(nameText);
 
       const descText = new Text({
         text: '',
-        style: new TextStyle({ fill: '#d8d8e0', fontFamily: 'monospace', fontSize: 14, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 24 }),
+        style: new TextStyle({ fill: '#d8d8e0', fontFamily: 'monospace', fontSize: 21, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 24 }),
       });
       descText.anchor.set(0.5, 0);
       descText.x = x + CARD_WIDTH / 2;
-      descText.y = CARD_Y + 110;
+      descText.y = CARD_Y + 150;
       this.addChild(descText);
       this.cardDescText.push(descText);
     }

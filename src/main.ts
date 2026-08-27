@@ -101,7 +101,7 @@ async function bootstrap(): Promise<void> {
       followLerp: balance.craft.followLerp,
       driftDamping: balance.craft.driftDamping,
       hitRadius: balance.craft.hitRadius.normal,
-      counterDuration: balance.counter.duration,
+      counterStreamInterval: balance.counter.streamIntervalSeconds,
       bounds: CRAFT_MOVE_BOUNDS,
       dragSensitivity: balance.craft.dragSensitivity,
     },
@@ -198,23 +198,28 @@ async function bootstrap(): Promise<void> {
     if (runEnded) window.location.reload();
   });
 
+  // ユーザーフィードバック「ワンタップで全部出るんじゃなくて長押ししてると溜めたカウンターが
+  // 少しずつ出る感じで」により、発動の瞬間(ヒットストップ/フラッシュ/音/全消去)と、
+  // 弾の発射(streamIntervalSecondsごとに1発、Craft側がタイミングを管理)を分離した。
+  // 1発あたりのダメージは発動時に確定させ、ストリーム中はそれを使い回す。
+  let pendingDamagePerBullet = 0;
   craft.onCounterFire = (charge) => {
-    // ユーザーフィードバックにより「吸収した弾を強力なカウンター弾として反射する」実装に変更。
-    // 02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」。総ダメージは既存の式のまま、
-    // それを chargePerBullet ごとに1発のカウンター弾へ分配して実際に飛ばし、命中判定させる。
+    // 02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」通り、charge=発射数を1:1にした
+    // (ユーザーフィードバック)。総ダメージは既存の式のままchargeで均等に割る。
     // atkMultiplier(chip_barrel)とcounterDamageBonus(chip_capacitor)をBuildSystemから反映する。
     const effectiveAtk = balance.player.atk * buildSystem.modifiers.atkMultiplier;
     const totalDamage =
       effectiveAtk * balance.counter.baseRatio * (1 + charge * balance.counter.scale) * (1 + buildSystem.modifiers.counterDamageBonus);
-    const bulletCount = Math.max(1, Math.round(charge / balance.counter.chargePerBullet));
-    const damagePerBullet = totalDamage / bulletCount;
+    pendingDamagePerBullet = charge > 0 ? totalDamage / charge : 0;
     if (charge >= balance.counter.clearThreshold) {
       bulletSystem.clearAllEnemyBullets((x, y) => scoreParticles.spawn(x, y));
     }
-    bulletSystem.spawnCounterBullets(craft.x, craft.y, bulletCount, damagePerBullet, balance.counter.bulletSpeed, balance.counter.spreadDeg);
     hitStopRemaining = balance.counter.hitStopSeconds;
     flashAlpha = 1;
     audioEngine.playCounterBlast(charge, balance.counter.clearThreshold, balance.drain.chargeMax);
+  };
+  craft.onCounterBulletFire = () => {
+    bulletSystem.spawnCounterBullets(craft.x, craft.y, 1, pendingDamagePerBullet, balance.counter.bulletSpeed, balance.counter.spreadDeg);
   };
 
   // カウンター弾の追尾先探索(ユーザーフィードバック「若干敵を追尾するように」)。

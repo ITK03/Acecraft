@@ -1,11 +1,12 @@
 {
   "_comment": "02_CORE_SPEC.md の [設計値] を集約する。T2以降のタスクで随時値を追加する。",
   "craft": {
-    "followLerp": 0.5,
+    "_followLerpComment": "ユーザーフィードバック「動かした時に慣性というか滑るというかを無くして欲しい」。0.5だと毎ステップ半分だけ追いつく=指を止めた後も数フレーム滑るように見えていたため、ほぼ即時追従(1.0)にした。",
+    "followLerp": 1.0,
     "driftDamping": 0.85,
     "hitRadius": { "casual": 8, "normal": 6, "ace": 5 },
-    "_dragSensitivityComment": "ユーザーフィードバック「画面のどこ触っても自由に動かせるように、正確に持たないといけないの大変すぎる」。指の移動量に掛ける倍率。1.0だと指の動き=機体の移動量(絶対量)だが、それだと機体全可動域を動かすのに指を大きく動かす必要があり大変なので、指の動きより大きく機体が動くようにする。",
-    "dragSensitivity": 1.8
+    "_dragSensitivityComment": "ユーザーフィードバック「動かした以上に動く感じを無くして欲しい」。前回1.8まで上げたが「動かした以上に動く」という逆方向のフィードバックが来たため、指の移動量=機体の移動量の1:1に戻した。",
+    "dragSensitivity": 1.0
   },
   "mainGun": {
     "_fireIntervalComment": "ユーザーフィードバック「こちらの攻撃も強すぎる、今の半分くらいでいい」。連射間隔を倍にして実質DPSを半減させた(0.12→0.24)。",
@@ -24,14 +25,14 @@
     "chargeMax": 30
   },
   "counter": {
-    "duration": 0.35,
     "clearThreshold": 10,
-    "_damageComment": "baseRatio/scale は「今回のカウンター全体の総ダメージ」を決める。それを下のchargePerBulletで割った数のカウンター弾に分配して反射する(ユーザーフィードバックで実装。02_CORE_SPEC.md §3.4の「charge の数だけカウンター弾を生成」を、既存の総ダメージ計算式と両立する形に調整した)。",
+    "_damageComment": "baseRatio/scale は「今回のカウンター全体の総ダメージ」を決める。それを charge(=発射する弾数)で割って1発あたりのダメージにする。02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」通り、chargeと発射数を1:1にした(ユーザーフィードバック)。",
     "baseRatio": 3.0,
     "scale": 0.08,
     "hitStopSeconds": 0.06,
     "particleFlightSeconds": 0.35,
-    "chargePerBullet": 3,
+    "_streamComment": "ユーザーフィードバック「ワンタップで全部出るんじゃなくて長押ししてると溜めたカウンターが少しずつ出る感じで」。指を離すか撃ち切るまでCOUNTER状態(無敵)が続き、streamIntervalSecondsごとに1発ずつ発射する。旧counter.durationは廃止(無敵時間=ストリームが続いている間、に置き換わったため)。",
+    "streamIntervalSeconds": 0.05,
     "bulletSpeed": 1200,
     "spreadDeg": 100,
     "_homingComment": "速さは変えず進行方向だけをhomingTurnRateDeg(度/秒)で目標へ寄せる。0にすると追尾なし(完全な直進)に戻せる。420度/秒は強すぎて至近距離で目標の周りをクルクル回り続ける不具合(ユーザーフィードバック)が出たため220まで落とし、homingMinDistance未満まで近づいたら追尾自体を切って直進させるようにした(それ以上曲げる必要がないほど近いため)。",

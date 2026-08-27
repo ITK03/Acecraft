@@ -5,8 +5,15 @@
  *   MOVE   --[タッチ終了]-->            DRAIN
  *   DRAIN  --[タッチ開始, charge==0]--> MOVE
  *   DRAIN  --[タッチ開始, charge>0]-->  COUNTER
- *   COUNTER --[counterDuration経過]-->  MOVE(指接地中) / DRAIN(指が離れている)
+ *   COUNTER --[charge=0まで撃ち切る or 指が離れる]--> MOVE(指接地中) / DRAIN(指が離れている)
  * 起動時の初期状態 = DRAIN(指が触れていないため)。
+ *
+ * カウンターの発射方式(ユーザーフィードバック「ワンタップで全部出るんじゃなくて長押ししてると
+ * 溜めたカウンターが少しずつ出る感じで」):
+ *   COUNTER中は streamIntervalSeconds ごとに charge を1減らしながら1発ずつ発射する
+ *   (onCounterBulletFire を都度呼ぶ)。charge が自然に0になるか、指を離した瞬間に
+ *   終了する(離した時点で残弾は破棄。02_CORE_SPEC.md §3.4「発動後 charge=0」に対応)。
+ *   charge の減り方=チャージリングの縮み方になるので、撃ち尽くしていく様子がそのまま見える。
  *
  * T2 時点では吸収システム(T4)もカウンター実処理(T5)も未実装のため charge は常に 0 であり、
  * COUNTER 状態には実質到達しない。ただし状態機械そのものは最終形として実装し、
@@ -35,7 +42,8 @@ export interface CraftConfig {
   followLerp: number;
   driftDamping: number;
   hitRadius: number;
-  counterDuration: number;
+  /** COUNTER中、charge を1減らして1発発射するまでの間隔(秒) */
+  counterStreamInterval: number;
   bounds: CraftBounds;
   /** 指の移動量に掛ける倍率。1.0超で「小さい指の動きで大きく動ける」感度になる */
   dragSensitivity: number;
@@ -70,11 +78,14 @@ export class Craft {
   private vx = 0;
   private vy = 0;
 
-  private counterElapsed = 0;
+  /** COUNTER中、次の1発までの残り時間 */
+  private counterFireTimer = 0;
   private wasTouching = false;
 
-  /** T5: DRAIN→COUNTER に遷移した瞬間に1回だけ呼ばれる。発動時の charge を渡す */
+  /** DRAIN→COUNTER に遷移した瞬間に1回だけ呼ばれる。発動時点の charge(=これから撃つ総数)を渡す */
   onCounterFire?: (charge: number) => void;
+  /** COUNTER中、streamIntervalSeconds ごとに1発発射するたびに呼ばれる(charge減算後) */
+  onCounterBulletFire?: () => void;
 
   get hitRadius(): number {
     return this.config.hitRadius;
@@ -104,9 +115,14 @@ export class Craft {
       this.trackedVy = (this.y - prevY) / dt;
 
       if (this.state === 'COUNTER') {
-        this.counterElapsed += dt;
-        if (this.counterElapsed >= this.config.counterDuration) {
-          this.charge = 0;
+        this.counterFireTimer -= dt;
+        if (this.counterFireTimer <= 0 && this.charge > 0) {
+          this.counterFireTimer += this.config.counterStreamInterval;
+          this.charge -= 1;
+          this.onCounterBulletFire?.();
+        }
+        if (this.charge <= 0 || !input.isTouching) {
+          this.charge = 0; // 指を離した時点の残弾は破棄する(発動後charge=0、02_CORE_SPEC.md §3.4)
           if (input.isTouching) {
             this.enterMove(input.fingerX, input.fingerY);
           } else {
@@ -133,7 +149,7 @@ export class Craft {
     if (touchStarted && this.state === 'DRAIN') {
       if (this.charge > 0) {
         this.state = 'COUNTER';
-        this.counterElapsed = 0;
+        this.counterFireTimer = 0; // 最初の1発はすぐ出る
         this.dragAnchorFingerX = input.fingerX;
         this.dragAnchorFingerY = input.fingerY;
         this.dragAnchorCraftX = this.x;
@@ -145,8 +161,8 @@ export class Craft {
     } else if (touchEnded && this.state === 'MOVE') {
       this.enterDrain();
     }
-    // COUNTER 中にタッチが離れても、カウンター終了まで遷移は待つ
-    // (update() 内の counterElapsed 判定で input.isTouching を見て事後処理する)
+    // COUNTER 中にタッチが離れても、update() 内でこのフレームのうちに終了処理される
+    // (charge<=0 or !input.isTouching の判定を参照)。
   }
 
   /**
@@ -162,7 +178,7 @@ export class Craft {
     this.vy = 0;
     this.trackedVx = 0;
     this.trackedVy = 0;
-    this.counterElapsed = 0;
+    this.counterFireTimer = 0;
     if (input.isTouching) {
       this.enterMove(input.fingerX, input.fingerY);
     } else {

@@ -110,13 +110,15 @@ export class BulletSystem {
 
   /**
    * カウンター弾(吸収した弾の反射)。02_CORE_SPEC.md §3.4「charge の数だけカウンター弾を生成」。
-   * 主砲と違って毎フレームではなく発動の瞬間に count 発をまとめて、正面(上方向)を中心に
-   * spreadDeg 度の扇状にばら撒く。1発ずつが強力で見た目も主砲弾より大きく白い。
+   * 上方向(-90°)を中心に spreadDeg 度の扇の中へ撃つ。1発ずつが強力で見た目も主砲弾より大きく白い。
+   * count>1で呼ぶと扇内に均等配置、count===1(長押しストリームでの通常呼び出し)では
+   * 扇内のランダムな角度に飛ばす(ユーザーフィードバックで「長押しで少しずつ発射」に変更したため、
+   * 1発ずつ呼ばれても毎回同じ中央角度に固まらないようにする)。
    */
   spawnCounterBullets(x: number, y: number, count: number, damagePerBullet: number, speed: number, spreadDeg: number): void {
     const spreadRad = (spreadDeg * Math.PI) / 180;
     for (let i = 0; i < count; i += 1) {
-      const t = count > 1 ? i / (count - 1) - 0.5 : 0; // -0.5..0.5(1発なら中央のみ)
+      const t = count > 1 ? i / (count - 1) - 0.5 : Math.random() - 0.5; // -0.5..0.5
       const angle = -Math.PI / 2 + t * spreadRad; // 上方向(-90°)を中心に扇状
       const vx = Math.cos(angle) * speed;
       const vy = Math.sin(angle) * speed;
