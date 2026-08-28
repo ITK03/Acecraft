@@ -49,6 +49,8 @@ interface ChipLevelStats {
   drainRadiusBonusPct?: number;
   homingTurnRateBonusPct?: number;
   critChanceBonusPct?: number;
+  meleeDamageBonusPct?: number;
+  laserWidthBonusPct?: number;
 }
 interface ChipDef {
   name: string;
@@ -114,6 +116,10 @@ export interface StatModifiers {
   homingTurnRateMultiplier: number;
   /** chip_targeting: クリティカル発生率(0〜1)。全ダメージ発生源で共通に判定する */
   critChance: number;
+  /** chip_edge: mod_bladeのダメージへの乗数(1.0=無補正) */
+  meleeDamageMultiplier: number;
+  /** chip_lens: mod_laserの幅(halfWidth)への乗数(1.0=無補正) */
+  laserWidthMultiplier: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -146,6 +152,8 @@ const BASE_MODIFIERS: StatModifiers = {
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
   critChance: 0,
+  meleeDamageMultiplier: 1,
+  laserWidthMultiplier: 1,
 };
 
 interface Candidate {
@@ -163,6 +171,8 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.drainRadiusBonusPct !== undefined) return `ドレイン範囲 +${stats.drainRadiusBonusPct}%`;
   if (stats.homingTurnRateBonusPct !== undefined) return `追尾性能 +${stats.homingTurnRateBonusPct}%`;
   if (stats.critChanceBonusPct !== undefined) return `クリティカル率 +${stats.critChanceBonusPct}%`;
+  if (stats.meleeDamageBonusPct !== undefined) return `近接ダメージ +${stats.meleeDamageBonusPct}%`;
+  if (stats.laserWidthBonusPct !== undefined) return `レーザー幅 +${stats.laserWidthBonusPct}%`;
   return '';
 }
 
@@ -253,6 +263,8 @@ export class BuildSystem {
     let drainRadiusBonusPct = 0;
     let homingTurnRateBonusPct = 0;
     let critChanceBonusPct = 0;
+    let meleeDamageBonusPct = 0;
+    let laserWidthBonusPct = 0;
     for (const [id, level] of this.chipLevels) {
       const stats = chips[id].levels[level - 1];
       atkBonusPct += stats.atkBonusPct ?? 0;
@@ -263,6 +275,8 @@ export class BuildSystem {
       drainRadiusBonusPct += stats.drainRadiusBonusPct ?? 0;
       homingTurnRateBonusPct += stats.homingTurnRateBonusPct ?? 0;
       critChanceBonusPct += stats.critChanceBonusPct ?? 0;
+      meleeDamageBonusPct += stats.meleeDamageBonusPct ?? 0;
+      laserWidthBonusPct += stats.laserWidthBonusPct ?? 0;
     }
 
     // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
@@ -357,6 +371,8 @@ export class BuildSystem {
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
       critChance: critChanceBonusPct / 100,
+      meleeDamageMultiplier: 1 + meleeDamageBonusPct / 100,
+      laserWidthMultiplier: 1 + laserWidthBonusPct / 100,
     };
     this.onModifiersChanged?.(this.modifiers);
   }

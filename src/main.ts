@@ -195,14 +195,16 @@ async function bootstrap(): Promise<void> {
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });
     // chip_targeting: 継続ダメージのため個々の発射でのランダム判定ではなく、期待値をそのままdpsへ織り込む。
+    // chip_lens: レーザー幅(halfWidth)への乗数。
     laserBeam.applyLoadout({
-      halfWidth: modifiers.laserHalfWidth,
+      halfWidth: modifiers.laserHalfWidth * modifiers.laserWidthMultiplier,
       damagePerSecond: modifiers.laserDamagePerSecond * (1 + modifiers.critChance * (balance.player.critDamageMultiplier - 1)),
     });
+    // chip_edge: 近接ダメージ(mod_bladeのダメージ)への乗数。
     wingBlade.applyLoadout({
       interval: modifiers.bladeInterval,
       radius: modifiers.bladeRadius,
-      damage: modifiers.bladeDamage,
+      damage: modifiers.bladeDamage * modifiers.meleeDamageMultiplier,
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });

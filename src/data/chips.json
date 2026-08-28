@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙しているが、Phase1着手分として既存システムへの倍率適用だけで完結する(新規サブシステム不要な)8種のみここに収録している。残り6種は未実装のため未収録(modules.jsonと同じ理由)。",
+  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙しているが、Phase1着手分として既存システムへの倍率適用だけで完結する(新規サブシステム不要な)10種のみここに収録している。chip_edge/chip_lensはそれぞれmod_blade/mod_laserの実装完了に伴い追加した。残り4種(chip_elastic等)は対応するモジュール(mod_bouncer等)が未実装のため未収録。",
   "chip_barrel": {
     "name": "バレル拡張",
     "maxLevel": 3,
@@ -47,5 +47,17 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "levels": [{ "critChanceBonusPct": 5 }, { "critChanceBonusPct": 10 }, { "critChanceBonusPct": 16 }]
+  },
+  "chip_edge": {
+    "name": "エッジ",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "levels": [{ "meleeDamageBonusPct": 20 }, { "meleeDamageBonusPct": 40 }, { "meleeDamageBonusPct": 70 }]
+  },
+  "chip_lens": {
+    "name": "レンズ",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "levels": [{ "laserWidthBonusPct": 20 }, { "laserWidthBonusPct": 40 }, { "laserWidthBonusPct": 65 }]
   }
 }
