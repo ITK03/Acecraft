@@ -62,7 +62,17 @@ export class LevelUpModal extends Container {
 
       const nameText = new Text({
         text: '',
-        style: new TextStyle({ fill: '#ffffff', fontFamily: 'monospace', fontSize: 26, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 20 }),
+        style: new TextStyle({
+          fill: '#ffffff',
+          fontFamily: 'monospace',
+          fontSize: 26,
+          align: 'center',
+          wordWrap: true,
+          // 日本語には単語区切りの空白がなく、breakWordsがないとwordWrapが効かず
+          // カード枠の外まで一直線にはみ出す(ユーザーフィードバックで発覚した不具合)。
+          breakWords: true,
+          wordWrapWidth: CARD_WIDTH - 20,
+        }),
       });
       nameText.anchor.set(0.5, 0);
       nameText.x = x + CARD_WIDTH / 2;
@@ -72,7 +82,15 @@ export class LevelUpModal extends Container {
 
       const descText = new Text({
         text: '',
-        style: new TextStyle({ fill: '#d8d8e0', fontFamily: 'monospace', fontSize: 21, align: 'center', wordWrap: true, wordWrapWidth: CARD_WIDTH - 24 }),
+        style: new TextStyle({
+          fill: '#d8d8e0',
+          fontFamily: 'monospace',
+          fontSize: 21,
+          align: 'center',
+          wordWrap: true,
+          breakWords: true,
+          wordWrapWidth: CARD_WIDTH - 24,
+        }),
       });
       descText.anchor.set(0.5, 0);
       descText.x = x + CARD_WIDTH / 2;
