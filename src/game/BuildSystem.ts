@@ -27,6 +27,10 @@ interface ModuleLevelStats {
   bladeRadius?: number;
   bladeInterval?: number;
   bladeDamage?: number;
+  boomerangInterval?: number;
+  boomerangDamage?: number;
+  boomerangSpeed?: number;
+  boomerangTurnSeconds?: number;
 }
 interface ModuleDef {
   name: string;
@@ -99,6 +103,11 @@ export interface StatModifiers {
   bladeRadius: number;
   bladeInterval: number;
   bladeDamage: number;
+  /** mod_boomerang(ブーメラン)。interval<=0で未所持扱い、Boomerang側は何もしない */
+  boomerangInterval: number;
+  boomerangDamage: number;
+  boomerangSpeed: number;
+  boomerangTurnSeconds: number;
   /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
@@ -130,6 +139,10 @@ const BASE_MODIFIERS: StatModifiers = {
   bladeRadius: 0,
   bladeInterval: 0,
   bladeDamage: 0,
+  boomerangInterval: 0,
+  boomerangDamage: 0,
+  boomerangSpeed: 0,
+  boomerangTurnSeconds: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
   critChance: 0,
@@ -159,6 +172,7 @@ function describeModuleLevel(stats: ModuleLevelStats): string {
   if (stats.strikeInterval !== undefined) return `${stats.strikeInterval}秒ごとに最もHPの高い敵を爆撃(威力${stats.strikeDamage})`;
   if (stats.laserDamagePerSecond !== undefined) return `貫通レーザー(秒間${stats.laserDamagePerSecond}ダメージ)。触れた敵弾も防ぐ`;
   if (stats.bladeInterval !== undefined) return `${stats.bladeInterval}秒ごとに至近の敵を薙ぐ(威力${stats.bladeDamage})`;
+  if (stats.boomerangInterval !== undefined) return `${stats.boomerangInterval}秒ごとにブーメラン弾(威力${stats.boomerangDamage})`;
   return `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
 }
 
@@ -271,6 +285,10 @@ export class BuildSystem {
     let bladeRadius = 0;
     let bladeInterval = 0;
     let bladeDamage = 0;
+    let boomerangInterval = 0;
+    let boomerangDamage = 0;
+    let boomerangSpeed = 0;
+    let boomerangTurnSeconds = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -300,6 +318,12 @@ export class BuildSystem {
         bladeRadius = stats.bladeRadius ?? 0;
         bladeDamage = stats.bladeDamage ?? 0;
       }
+      if (stats.boomerangInterval !== undefined) {
+        boomerangInterval = stats.boomerangInterval;
+        boomerangDamage = stats.boomerangDamage ?? 0;
+        boomerangSpeed = stats.boomerangSpeed ?? 0;
+        boomerangTurnSeconds = stats.boomerangTurnSeconds ?? 0;
+      }
     }
 
     this.modifiers = {
@@ -326,6 +350,10 @@ export class BuildSystem {
       bladeRadius,
       bladeInterval,
       bladeDamage,
+      boomerangInterval,
+      boomerangDamage,
+      boomerangSpeed,
+      boomerangTurnSeconds,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
       critChance: critChanceBonusPct / 100,

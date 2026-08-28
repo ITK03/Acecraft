@@ -1,6 +1,6 @@
 import { Container, Graphics } from 'pixi.js';
 import { LOGICAL_WIDTH } from '../core/Viewport';
-import type { BulletSystem } from './BulletSystem';
+import { encodePlayerFactionKind, decodePlayerFactionKind, type BulletSystem } from './BulletSystem';
 import bossDefs from '../data/bosses.json';
 
 /**
@@ -175,14 +175,13 @@ export class BossController {
       const rSum = def.hitRadius + bullet.radius;
       if (dx * dx + dy * dy > rSum * rSum) return;
       this.hitBulletScratch[hitCount] = index;
-      this.hitBulletKindScratch[hitCount] = kind === 'counter' ? 1 : kind === 'flare' ? 2 : 0;
+      this.hitBulletKindScratch[hitCount] = encodePlayerFactionKind(kind);
       this.hitDamageScratch[hitCount] = bullet.damage;
       hitCount += 1;
     });
 
     for (let i = 0; i < hitCount; i += 1) {
-      const hitKind = this.hitBulletKindScratch[i] === 1 ? 'counter' : this.hitBulletKindScratch[i] === 2 ? 'flare' : 'player';
-      bulletSystem.consumeHit(hitKind, this.hitBulletScratch[i]);
+      bulletSystem.consumeHit(decodePlayerFactionKind(this.hitBulletKindScratch[i]), this.hitBulletScratch[i]);
       // TSの制御フロー解析は applyDamage() 内での this.state 変化を追えないため型アサーションで比較する
       if ((this.state as BossState) === 'defeated') continue; // 前のヒットで倒れていたら以降は無視
       this.applyDamage(this.hitDamageScratch[i], bulletSystem);

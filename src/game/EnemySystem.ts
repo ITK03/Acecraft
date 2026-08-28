@@ -2,7 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import { Pool, type Poolable } from '../core/Pool';
 import { SpatialGrid } from '../core/SpatialGrid';
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '../core/Viewport';
-import type { BulletSystem } from './BulletSystem';
+import { encodePlayerFactionKind, decodePlayerFactionKind, type BulletSystem } from './BulletSystem';
 import enemyDefs from '../data/enemies.json';
 import balance from '../data/balance.json';
 
@@ -104,8 +104,8 @@ export class EnemySystem {
 
   // resolvePlayerBulletHits用: Pool.forEachActive の走査中に同じプールから release すると
   // 密配列(スワップ削除)が壊れるため、命中した弾の添字を先に集めてから走査後にまとめて消費する。
-  // 主砲弾/カウンター弾/フレア弾の3種を扱うため、どの弾プールから消費すべきかも記録しておく
-  // (0=player, 1=counter, 2=flare)。
+  // 主砲弾/カウンター弾/フレア弾/ブーメラン弾の4種を扱うため、どの弾プールから消費すべきかも
+  // encodePlayerFactionKind/decodePlayerFactionKind(BulletSystem)で記録しておく。
   private readonly hitBulletScratch: Int32Array;
   private readonly hitBulletKindScratch: Uint8Array;
   private readonly hitEnemyScratch: Int32Array;
@@ -142,7 +142,11 @@ export class EnemySystem {
     this.gridScratchX = new Float32Array(this.capacity);
     this.gridScratchY = new Float32Array(this.capacity);
     this.gridScratchKey = new Int32Array(this.capacity);
-    const maxPlayerFactionBullets = balance.bullets.maxActivePlayerBullets + balance.bullets.maxActiveCounterBullets;
+    const maxPlayerFactionBullets =
+      balance.bullets.maxActivePlayerBullets +
+      balance.bullets.maxActiveCounterBullets +
+      balance.bullets.maxActiveFlareBullets +
+      balance.bullets.maxActiveBoomerangBullets;
     this.hitBulletScratch = new Int32Array(maxPlayerFactionBullets);
     this.hitBulletKindScratch = new Uint8Array(maxPlayerFactionBullets);
     this.hitEnemyScratch = new Int32Array(maxPlayerFactionBullets);
@@ -415,7 +419,7 @@ export class EnemySystem {
       });
       if (hitEnemyIndex === -1) return;
       this.hitBulletScratch[hitCount] = bulletIndex;
-      this.hitBulletKindScratch[hitCount] = kind === 'counter' ? 1 : kind === 'flare' ? 2 : 0;
+      this.hitBulletKindScratch[hitCount] = encodePlayerFactionKind(kind);
       this.hitEnemyScratch[hitCount] = hitEnemyIndex;
       this.hitDamageScratch[hitCount] = bullet.damage;
       hitCount += 1;
@@ -424,8 +428,7 @@ export class EnemySystem {
     for (let i = 0; i < hitCount; i += 1) {
       const enemyIndex = this.hitEnemyScratch[i];
       const enemy = this.pool.get(enemyIndex);
-      const hitKind = this.hitBulletKindScratch[i] === 1 ? 'counter' : this.hitBulletKindScratch[i] === 2 ? 'flare' : 'player';
-      bulletSystem.consumeHit(hitKind, this.hitBulletScratch[i]);
+      bulletSystem.consumeHit(decodePlayerFactionKind(this.hitBulletKindScratch[i]), this.hitBulletScratch[i]);
       if (!enemy.active) continue; // 同フレームで既に別弾に倒されている場合はスキップ
       enemy.hp -= this.hitDamageScratch[i];
       if (enemy.hp <= 0) this.killEnemy(enemyIndex);

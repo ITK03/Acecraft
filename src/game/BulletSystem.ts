@@ -1,6 +1,15 @@
 import { Container, Particle, ParticleContainer, type Renderer } from 'pixi.js';
 import { Pool, type Poolable } from '../core/Pool';
-import { bakeBulletTexture, ENEMY_NORMAL_BULLET, ENEMY_CHARGE_BULLET, PLAYER_BULLET, COUNTER_BULLET, FLARE_BULLET, type BulletVisualConfig } from './BulletTextures';
+import {
+  bakeBulletTexture,
+  ENEMY_NORMAL_BULLET,
+  ENEMY_CHARGE_BULLET,
+  PLAYER_BULLET,
+  COUNTER_BULLET,
+  FLARE_BULLET,
+  BOOMERANG_BULLET,
+  type BulletVisualConfig,
+} from './BulletTextures';
 import balance from '../data/balance.json';
 
 /**
@@ -29,10 +38,28 @@ export interface Bullet extends Poolable {
   chargeable: boolean;
   /** 残り貫通回数。0で命中時に消滅、-1は無限貫通(将来のモジュール用) */
   pierce: number;
+  /** mod_boomerang用。残り秒数が0以下になった瞬間に1度だけ進行方向を反転する。他kindでは未使用(0のまま) */
+  turnTimer: number;
 }
 
-export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter' | 'flare';
-const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter', 'flare'];
+export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter' | 'flare' | 'boomerang';
+const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter', 'flare', 'boomerang'];
+
+export type PlayerFactionKind = 'player' | 'counter' | 'flare' | 'boomerang';
+// EnemySystem/BossControllerのresolvePlayerBulletHits系が「命中した弾がどのkindのプール由来か」を
+// Uint8Arrayスクラッチへ詰めるための共通エンコード表。kindが増えるたびに各所のif/ternary連鎖を
+// individually更新するとズレる恐れがあるため、1箇所にまとめておく。
+const PLAYER_FACTION_KINDS: readonly PlayerFactionKind[] = ['player', 'counter', 'flare', 'boomerang'];
+export function encodePlayerFactionKind(kind: PlayerFactionKind): number {
+  return PLAYER_FACTION_KINDS.indexOf(kind);
+}
+export function decodePlayerFactionKind(code: number): PlayerFactionKind {
+  return PLAYER_FACTION_KINDS[code];
+}
+// mod_boomerangの弾は往路/復路の両方で複数の敵を貫通できるよう有限の貫通回数を持たせる。
+// 無限(pierce=-1)にはしない: 敵とほぼ同じ速度・向きで並走した場合に毎フレーム同じ敵へ命中し
+// 続けるコーナーケースを避けるため。[設計値]
+const BOOMERANG_PIERCE = 6;
 
 const OFFSCREEN_MARGIN = 120;
 // Particle を隠す(=解放中であることを示す)ためのパーキング座標。位置は dynamic property なので
@@ -41,7 +68,7 @@ const PARKED_X = -99999;
 const PARKED_Y = -99999;
 
 function makeBullet(): Bullet {
-  return { active: false, faction: 'enemy', x: 0, y: 0, vx: 0, vy: 0, radius: 0, damage: 0, chargeable: false, pierce: 0 };
+  return { active: false, faction: 'enemy', x: 0, y: 0, vx: 0, vy: 0, radius: 0, damage: 0, chargeable: false, pierce: 0, turnTimer: 0 };
 }
 
 interface KindEntry {
@@ -73,6 +100,7 @@ export class BulletSystem {
       player: this.makeEntry(renderer, balance.bullets.maxActivePlayerBullets, PLAYER_BULLET, 'player'),
       counter: this.makeEntry(renderer, balance.bullets.maxActiveCounterBullets, COUNTER_BULLET, 'player'),
       flare: this.makeEntry(renderer, balance.bullets.maxActiveFlareBullets, FLARE_BULLET, 'player'),
+      boomerang: this.makeEntry(renderer, balance.bullets.maxActiveBoomerangBullets, BOOMERANG_BULLET, 'player'),
     };
     this.view.addChild(
       this.entries.enemyNormal.container,
@@ -80,6 +108,7 @@ export class BulletSystem {
       this.entries.player.container,
       this.entries.counter.container,
       this.entries.flare.container,
+      this.entries.boomerang.container,
     );
   }
 
@@ -113,6 +142,27 @@ export class BulletSystem {
   /** mod_homingflare用。発射直後は直進で、steerFlareBullets()が毎フレーム進行方向を曲げる */
   spawnFlareBullet(x: number, y: number, vx: number, vy: number, damage: number): void {
     this.spawn('flare', x, y, vx, vy, damage, false);
+  }
+
+  /**
+   * mod_boomerang用。turnSeconds秒直進した後、update()側(turnBoomerangs)で1度だけ進行方向を
+   * 反転して戻ってくる。往路/復路の両方で複数の敵に当たるようBOOMERANG_PIERCEを持たせる。
+   */
+  spawnBoomerangBullet(x: number, y: number, vx: number, vy: number, damage: number, turnSeconds: number): void {
+    const entry = this.entries.boomerang;
+    const acquired = entry.pool.acquire();
+    if (!acquired) return;
+    const { index, item } = acquired;
+    item.x = x;
+    item.y = y;
+    item.vx = vx;
+    item.vy = vy;
+    item.damage = damage;
+    item.chargeable = false;
+    item.pierce = BOOMERANG_PIERCE;
+    item.turnTimer = turnSeconds;
+    entry.particles[index].x = x;
+    entry.particles[index].y = y;
   }
 
   /**
@@ -205,9 +255,22 @@ export class BulletSystem {
 
   /** 固定ステップで呼ぶ。移動・画面外回収・Particle座標同期を行う */
   update(dt: number, worldWidth: number, worldHeight: number): void {
+    this.turnBoomerangs(dt);
     for (let i = 0; i < ALL_KINDS.length; i += 1) {
       this.updateKind(this.entries[ALL_KINDS[i]], dt, worldWidth, worldHeight);
     }
+  }
+
+  /** mod_boomerang用。turnTimerが尽きた瞬間に1度だけ進行方向を反転させる(以後は0のまま何もしない) */
+  private turnBoomerangs(dt: number): void {
+    this.entries.boomerang.pool.forEachActive((bullet) => {
+      if (bullet.turnTimer <= 0) return;
+      bullet.turnTimer -= dt;
+      if (bullet.turnTimer <= 0) {
+        bullet.vx = -bullet.vx;
+        bullet.vy = -bullet.vy;
+      }
+    });
   }
 
   private updateKind(entry: KindEntry, dt: number, worldWidth: number, worldHeight: number): void {
@@ -284,11 +347,12 @@ export class BulletSystem {
     return count;
   }
 
-  /** 主砲弾・カウンター弾・フレア弾をまとめて走査する(いずれも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
-  forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: 'player' | 'counter' | 'flare', index: number) => void): void {
+  /** 主砲弾・カウンター弾・フレア弾・ブーメラン弾をまとめて走査する(いずれも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
+  forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: PlayerFactionKind, index: number) => void): void {
     this.entries.player.pool.forEachActive((bullet, index) => fn(bullet, 'player', index));
     this.entries.counter.pool.forEachActive((bullet, index) => fn(bullet, 'counter', index));
     this.entries.flare.pool.forEachActive((bullet, index) => fn(bullet, 'flare', index));
+    this.entries.boomerang.pool.forEachActive((bullet, index) => fn(bullet, 'boomerang', index));
   }
 
   forEachActiveEnemyChargeBullet(fn: (bullet: Bullet, index: number) => void): void {
@@ -305,7 +369,9 @@ export class BulletSystem {
       this.entries.enemyNormal.pool.activeCount +
       this.entries.enemyCharge.pool.activeCount +
       this.entries.player.pool.activeCount +
-      this.entries.counter.pool.activeCount
+      this.entries.counter.pool.activeCount +
+      this.entries.flare.pool.activeCount +
+      this.entries.boomerang.pool.activeCount
     );
   }
 

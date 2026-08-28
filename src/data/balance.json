@@ -49,6 +49,7 @@
     "maxActivePlayerBullets": 400,
     "maxActiveCounterBullets": 40,
     "maxActiveFlareBullets": 24,
+    "maxActiveBoomerangBullets": 24,
     "_chargeCapacityRatioComment": "enemyCharge/enemyNormalの2プールへの容量配分比。実際の発生確率(chargeable)はenemies.json/bosses.jsonの各fireScript/patternが個別に持つ(通常0.30、ボスの大技のみ0.6〜0.7に上げて「溜めて返す」設計にしている、02_CORE_SPEC.md §5.4)。ここはその中で最も高いボス戦想定(0.35)に容量を合わせておくことで、大技連発時にプール枯渇でチャージ弾が欠落しないようにするための値。",
     "chargeCapacityRatio": 0.35
   },

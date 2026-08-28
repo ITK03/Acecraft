@@ -71,3 +71,11 @@ export const FLARE_BULLET: BulletVisualConfig = {
   outlineColor: 0x1a1020,
   outlineWidth: 2,
 };
+
+// mod_boomerang(ブーメラン)の弾。既存の全弾と被らない色相として琥珀色を採用する。[設計値]
+export const BOOMERANG_BULLET: BulletVisualConfig = {
+  radius: 10,
+  fillColor: 0xffc266,
+  outlineColor: 0x1a1020,
+  outlineWidth: 2,
+};

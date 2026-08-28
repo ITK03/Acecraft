@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_bladeのみここに収録している。残り6種(mod_boomerang等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_blade/mod_boomerangのみここに収録している。残り5種(mod_tesla等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -64,6 +64,17 @@
       { "bladeInterval": 1.8, "bladeRadius": 90, "bladeDamage": 18 },
       { "bladeInterval": 1.5, "bladeRadius": 105, "bladeDamage": 24 },
       { "bladeInterval": 1.2, "bladeRadius": 120, "bladeDamage": 32 }
+    ]
+  },
+  "mod_boomerang": {
+    "name": "ブーメラン",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["aoe"],
+    "levels": [
+      { "boomerangInterval": 2.0, "boomerangDamage": 14, "boomerangSpeed": 900, "boomerangTurnSeconds": 0.35 },
+      { "boomerangInterval": 1.7, "boomerangDamage": 18, "boomerangSpeed": 950, "boomerangTurnSeconds": 0.32 },
+      { "boomerangInterval": 1.4, "boomerangDamage": 24, "boomerangSpeed": 1000, "boomerangTurnSeconds": 0.3 }
     ]
   }
 }
