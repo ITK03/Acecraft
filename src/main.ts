@@ -28,6 +28,7 @@ import { PinpointStrike } from './game/PinpointStrike';
 import { LaserBeam } from './game/LaserBeam';
 import { WingBlade } from './game/WingBlade';
 import { Boomerang } from './game/Boomerang';
+import { Bouncer } from './game/Bouncer';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -139,6 +140,8 @@ async function bootstrap(): Promise<void> {
   const wingBlade = new WingBlade();
   // Phase 1: mod_boomerang(ブーメラン)。未所持(interval<=0)の間は発射しない。
   const boomerang = new Boomerang();
+  // Phase 1: mod_bouncer(バウンサー)。未所持(interval<=0)の間は発射しない。
+  const bouncer = new Bouncer();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -213,6 +216,14 @@ async function bootstrap(): Promise<void> {
       damage: modifiers.boomerangDamage,
       speed: modifiers.boomerangSpeed,
       turnSeconds: modifiers.boomerangTurnSeconds,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    bouncer.applyLoadout({
+      interval: modifiers.bouncerInterval,
+      damage: modifiers.bouncerDamage,
+      speed: modifiers.bouncerSpeed,
+      maxBounces: modifiers.bouncerMaxBounces,
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });
@@ -396,6 +407,7 @@ async function bootstrap(): Promise<void> {
       mainGun.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       homingFlare.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       boomerang.update(dt, craft.state, craft.x, craft.y, bulletSystem);
+      bouncer.update(dt, craft.state, craft.x, craft.y, bulletSystem);
       // ドレインは弾の速度をこのフレーム分書き換えるので、必ず bulletSystem.update() より前に呼ぶ。
       drainField.update(dt, craft, bulletSystem);
       // カウンター弾/フレア弾の追尾も同様に、移動計算(bulletSystem.update)より前に速度の向きを曲げる。

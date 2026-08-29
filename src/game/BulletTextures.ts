@@ -79,3 +79,11 @@ export const BOOMERANG_BULLET: BulletVisualConfig = {
   outlineColor: 0x1a1020,
   outlineWidth: 2,
 };
+
+// mod_bouncer(バウンサー)の弾。既存の全弾と被らない色相として紫を採用する。[設計値]
+export const BOUNCER_BULLET: BulletVisualConfig = {
+  radius: 9,
+  fillColor: 0xc9a0ff,
+  outlineColor: 0x1a1020,
+  outlineWidth: 2,
+};

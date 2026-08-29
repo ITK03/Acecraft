@@ -82,6 +82,8 @@ const MAX_HIT_RADIUS = Math.max(...ENEMY_TYPE_IDS.map((id) => defs[id].hitRadius
 const CONTACT_HIT_CAPACITY = 8;
 const BEAM_HIT_CAPACITY = 24;
 const RADIUS_HIT_CAPACITY = 24;
+// mod_bouncer用。命中した敵の周りでどこまで「次の的」を探すか。[設計値]
+const BOUNCE_SEARCH_RADIUS = 400;
 
 function makeEnemy(): Enemy {
   return { active: false, typeId: 'grunt', x: 0, y: 0, baseX: 0, age: 0, hp: 0, maxHp: 0, fireCooldown: 0 };
@@ -104,12 +106,16 @@ export class EnemySystem {
 
   // resolvePlayerBulletHits用: Pool.forEachActive の走査中に同じプールから release すると
   // 密配列(スワップ削除)が壊れるため、命中した弾の添字を先に集めてから走査後にまとめて消費する。
-  // 主砲弾/カウンター弾/フレア弾/ブーメラン弾の4種を扱うため、どの弾プールから消費すべきかも
-  // encodePlayerFactionKind/decodePlayerFactionKind(BulletSystem)で記録しておく。
+  // 主砲弾/カウンター弾/フレア弾/ブーメラン弾/バウンサー弾の5種を扱うため、どの弾プールから
+  // 消費すべきかもencodePlayerFactionKind/decodePlayerFactionKind(BulletSystem)で記録しておく。
   private readonly hitBulletScratch: Int32Array;
   private readonly hitBulletKindScratch: Uint8Array;
   private readonly hitEnemyScratch: Int32Array;
   private readonly hitDamageScratch: Float32Array;
+  // mod_bouncer用。命中した瞬間の弾速(方向は次の的へ向け直すため速さだけ保持する)
+  private readonly hitBulletSpeedScratch: Float32Array;
+  // findNearestActiveEnemyExcluding の書き込み先(mod_bouncerのbounceBullet呼び出し1回につき使い回す)
+  private readonly bounceTargetScratch = { x: 0, y: 0 };
   // resolveContactWithCraft用の同種スクラッチ(接触した敵を先に集めてから走査後にkillEnemyする)
   private readonly contactHitScratch = new Int32Array(CONTACT_HIT_CAPACITY);
   // applyBeamDamage(mod_laser)用の同種スクラッチ(範囲内の敵を先に集めてから走査後にダメージ適用する)
@@ -146,11 +152,13 @@ export class EnemySystem {
       balance.bullets.maxActivePlayerBullets +
       balance.bullets.maxActiveCounterBullets +
       balance.bullets.maxActiveFlareBullets +
-      balance.bullets.maxActiveBoomerangBullets;
+      balance.bullets.maxActiveBoomerangBullets +
+      balance.bullets.maxActiveBouncerBullets;
     this.hitBulletScratch = new Int32Array(maxPlayerFactionBullets);
     this.hitBulletKindScratch = new Uint8Array(maxPlayerFactionBullets);
     this.hitEnemyScratch = new Int32Array(maxPlayerFactionBullets);
     this.hitDamageScratch = new Float32Array(maxPlayerFactionBullets);
+    this.hitBulletSpeedScratch = new Float32Array(maxPlayerFactionBullets);
 
     for (let i = 0; i < this.capacity; i += 1) {
       // 見た目は種類ごとに異なるため、出現時(trySpawnWaveEnemy)に描き直す。ここでは空で確保するだけ。
@@ -323,6 +331,28 @@ export class EnemySystem {
   }
 
   /**
+   * mod_bouncer用。(x,y)から半径maxDistance以内で、excludeIndex(直前に命中した敵)を除いた
+   * 最も近いアクティブな敵のpool indexを返す(いなければ-1)。座標はoutに書き込む。
+   */
+  findNearestActiveEnemyExcluding(x: number, y: number, maxDistance: number, excludeIndex: number, out: { x: number; y: number }): number {
+    let bestIndex = -1;
+    let bestDistSq = maxDistance * maxDistance;
+    this.pool.forEachActive((enemy, index) => {
+      if (index === excludeIndex) return;
+      const dx = enemy.x - x;
+      const dy = enemy.y - y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= bestDistSq) {
+        bestDistSq = distSq;
+        bestIndex = index;
+        out.x = enemy.x;
+        out.y = enemy.y;
+      }
+    });
+    return bestIndex;
+  }
+
+  /**
    * mod_strike_s(ピンポイントストライク)用。画面内でHPが最も高いアクティブな敵のpool indexを
    * 返し(いなければ-1)、その座標をoutへ書き込む(演出用。毎フレーム呼ばれる想定ではないため
    * findNearestActiveEnemyほど神経質にアロケーションを避ける必要はないが、同じout方式に揃える)。
@@ -422,13 +452,31 @@ export class EnemySystem {
       this.hitBulletKindScratch[hitCount] = encodePlayerFactionKind(kind);
       this.hitEnemyScratch[hitCount] = hitEnemyIndex;
       this.hitDamageScratch[hitCount] = bullet.damage;
+      this.hitBulletSpeedScratch[hitCount] = Math.sqrt(bullet.vx * bullet.vx + bullet.vy * bullet.vy);
       hitCount += 1;
     });
 
     for (let i = 0; i < hitCount; i += 1) {
       const enemyIndex = this.hitEnemyScratch[i];
       const enemy = this.pool.get(enemyIndex);
-      bulletSystem.consumeHit(decodePlayerFactionKind(this.hitBulletKindScratch[i]), this.hitBulletScratch[i]);
+      const kind = decodePlayerFactionKind(this.hitBulletKindScratch[i]);
+      const bulletIndex = this.hitBulletScratch[i];
+      if (kind === 'bouncer') {
+        // mod_bouncer: 消滅させず、命中した敵以外で最も近いアクティブな敵へ方向転換させる。
+        // 見つからなければ通常通り消滅させる。
+        const nextIndex = this.findNearestActiveEnemyExcluding(enemy.x, enemy.y, BOUNCE_SEARCH_RADIUS, enemyIndex, this.bounceTargetScratch);
+        if (nextIndex === -1) {
+          bulletSystem.consumeHit(kind, bulletIndex);
+        } else {
+          const dx = this.bounceTargetScratch.x - enemy.x;
+          const dy = this.bounceTargetScratch.y - enemy.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const speed = this.hitBulletSpeedScratch[i];
+          bulletSystem.bounceBullet(bulletIndex, (dx / dist) * speed, (dy / dist) * speed);
+        }
+      } else {
+        bulletSystem.consumeHit(kind, bulletIndex);
+      }
       if (!enemy.active) continue; // 同フレームで既に別弾に倒されている場合はスキップ
       enemy.hp -= this.hitDamageScratch[i];
       if (enemy.hp <= 0) this.killEnemy(enemyIndex);

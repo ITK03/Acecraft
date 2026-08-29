@@ -8,6 +8,7 @@ import {
   COUNTER_BULLET,
   FLARE_BULLET,
   BOOMERANG_BULLET,
+  BOUNCER_BULLET,
   type BulletVisualConfig,
 } from './BulletTextures';
 import balance from '../data/balance.json';
@@ -42,14 +43,14 @@ export interface Bullet extends Poolable {
   turnTimer: number;
 }
 
-export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter' | 'flare' | 'boomerang';
-const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter', 'flare', 'boomerang'];
+export type BulletKind = 'enemyNormal' | 'enemyCharge' | 'player' | 'counter' | 'flare' | 'boomerang' | 'bouncer';
+const ALL_KINDS: readonly BulletKind[] = ['enemyNormal', 'enemyCharge', 'player', 'counter', 'flare', 'boomerang', 'bouncer'];
 
-export type PlayerFactionKind = 'player' | 'counter' | 'flare' | 'boomerang';
+export type PlayerFactionKind = 'player' | 'counter' | 'flare' | 'boomerang' | 'bouncer';
 // EnemySystem/BossControllerのresolvePlayerBulletHits系が「命中した弾がどのkindのプール由来か」を
 // Uint8Arrayスクラッチへ詰めるための共通エンコード表。kindが増えるたびに各所のif/ternary連鎖を
 // individually更新するとズレる恐れがあるため、1箇所にまとめておく。
-const PLAYER_FACTION_KINDS: readonly PlayerFactionKind[] = ['player', 'counter', 'flare', 'boomerang'];
+const PLAYER_FACTION_KINDS: readonly PlayerFactionKind[] = ['player', 'counter', 'flare', 'boomerang', 'bouncer'];
 export function encodePlayerFactionKind(kind: PlayerFactionKind): number {
   return PLAYER_FACTION_KINDS.indexOf(kind);
 }
@@ -101,6 +102,7 @@ export class BulletSystem {
       counter: this.makeEntry(renderer, balance.bullets.maxActiveCounterBullets, COUNTER_BULLET, 'player'),
       flare: this.makeEntry(renderer, balance.bullets.maxActiveFlareBullets, FLARE_BULLET, 'player'),
       boomerang: this.makeEntry(renderer, balance.bullets.maxActiveBoomerangBullets, BOOMERANG_BULLET, 'player'),
+      bouncer: this.makeEntry(renderer, balance.bullets.maxActiveBouncerBullets, BOUNCER_BULLET, 'player'),
     };
     this.view.addChild(
       this.entries.enemyNormal.container,
@@ -109,6 +111,7 @@ export class BulletSystem {
       this.entries.counter.container,
       this.entries.flare.container,
       this.entries.boomerang.container,
+      this.entries.bouncer.container,
     );
   }
 
@@ -163,6 +166,42 @@ export class BulletSystem {
     item.turnTimer = turnSeconds;
     entry.particles[index].x = x;
     entry.particles[index].y = y;
+  }
+
+  /**
+   * mod_bouncer用。敵に命中するたびに次の的へ方向転換する(EnemySystem.resolvePlayerBulletHits
+   * が次の的を探してbounceBullet()を呼ぶ)。pierceを「残りバウンス回数」として流用する。
+   */
+  spawnBouncerBullet(x: number, y: number, vx: number, vy: number, damage: number, maxBounces: number): void {
+    const entry = this.entries.bouncer;
+    const acquired = entry.pool.acquire();
+    if (!acquired) return;
+    const { index, item } = acquired;
+    item.x = x;
+    item.y = y;
+    item.vx = vx;
+    item.vy = vy;
+    item.damage = damage;
+    item.chargeable = false;
+    item.pierce = maxBounces;
+    entry.particles[index].x = x;
+    entry.particles[index].y = y;
+  }
+
+  /**
+   * mod_bouncer用。次の的への方向へ進行方向を変え、残りバウンス回数(pierce)を1減らす。
+   * 尽きていれば(次の的が見つからなかった場合も含め)consumeHitと同様にそのまま消滅させる。
+   */
+  bounceBullet(index: number, vx: number, vy: number): void {
+    const entry = this.entries.bouncer;
+    const bullet = entry.pool.get(index);
+    if (bullet.pierce <= 0) {
+      this.releaseIndex(entry, index);
+      return;
+    }
+    bullet.pierce -= 1;
+    bullet.vx = vx;
+    bullet.vy = vy;
   }
 
   /**
@@ -347,12 +386,13 @@ export class BulletSystem {
     return count;
   }
 
-  /** 主砲弾・カウンター弾・フレア弾・ブーメラン弾をまとめて走査する(いずれも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
+  /** 主砲弾・カウンター弾・フレア弾・ブーメラン弾・バウンサー弾をまとめて走査する(いずれも自機側の攻撃で、敵/ボスへの命中判定は共通のため) */
   forEachActivePlayerFactionBullet(fn: (bullet: Bullet, kind: PlayerFactionKind, index: number) => void): void {
     this.entries.player.pool.forEachActive((bullet, index) => fn(bullet, 'player', index));
     this.entries.counter.pool.forEachActive((bullet, index) => fn(bullet, 'counter', index));
     this.entries.flare.pool.forEachActive((bullet, index) => fn(bullet, 'flare', index));
     this.entries.boomerang.pool.forEachActive((bullet, index) => fn(bullet, 'boomerang', index));
+    this.entries.bouncer.pool.forEachActive((bullet, index) => fn(bullet, 'bouncer', index));
   }
 
   forEachActiveEnemyChargeBullet(fn: (bullet: Bullet, index: number) => void): void {
@@ -371,7 +411,8 @@ export class BulletSystem {
       this.entries.player.pool.activeCount +
       this.entries.counter.pool.activeCount +
       this.entries.flare.pool.activeCount +
-      this.entries.boomerang.pool.activeCount
+      this.entries.boomerang.pool.activeCount +
+      this.entries.bouncer.pool.activeCount
     );
   }
 
