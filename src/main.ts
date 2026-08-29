@@ -219,11 +219,12 @@ async function bootstrap(): Promise<void> {
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });
+    // chip_elastic: 最大バウンス回数への固定加算。
     bouncer.applyLoadout({
       interval: modifiers.bouncerInterval,
       damage: modifiers.bouncerDamage,
       speed: modifiers.bouncerSpeed,
-      maxBounces: modifiers.bouncerMaxBounces,
+      maxBounces: modifiers.bouncerMaxBounces + modifiers.bounceCountBonus,
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });

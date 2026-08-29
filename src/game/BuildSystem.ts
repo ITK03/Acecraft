@@ -55,6 +55,8 @@ interface ChipLevelStats {
   critChanceBonusPct?: number;
   meleeDamageBonusPct?: number;
   laserWidthBonusPct?: number;
+  /** chip_elastic用。%ではなく固定加算(+1/2/3) */
+  bounceCountBonus?: number;
 }
 interface ChipDef {
   name: string;
@@ -129,6 +131,8 @@ export interface StatModifiers {
   meleeDamageMultiplier: number;
   /** chip_lens: mod_laserの幅(halfWidth)への乗数(1.0=無補正) */
   laserWidthMultiplier: number;
+  /** chip_elastic: mod_bouncerの最大バウンス回数への固定加算(0=無補正) */
+  bounceCountBonus: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -167,6 +171,7 @@ const BASE_MODIFIERS: StatModifiers = {
   critChance: 0,
   meleeDamageMultiplier: 1,
   laserWidthMultiplier: 1,
+  bounceCountBonus: 0,
 };
 
 interface Candidate {
@@ -186,6 +191,7 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.critChanceBonusPct !== undefined) return `クリティカル率 +${stats.critChanceBonusPct}%`;
   if (stats.meleeDamageBonusPct !== undefined) return `近接ダメージ +${stats.meleeDamageBonusPct}%`;
   if (stats.laserWidthBonusPct !== undefined) return `レーザー幅 +${stats.laserWidthBonusPct}%`;
+  if (stats.bounceCountBonus !== undefined) return `跳ね返り回数 +${stats.bounceCountBonus}`;
   return '';
 }
 
@@ -279,6 +285,7 @@ export class BuildSystem {
     let critChanceBonusPct = 0;
     let meleeDamageBonusPct = 0;
     let laserWidthBonusPct = 0;
+    let bounceCountBonus = 0;
     for (const [id, level] of this.chipLevels) {
       const stats = chips[id].levels[level - 1];
       atkBonusPct += stats.atkBonusPct ?? 0;
@@ -291,6 +298,7 @@ export class BuildSystem {
       critChanceBonusPct += stats.critChanceBonusPct ?? 0;
       meleeDamageBonusPct += stats.meleeDamageBonusPct ?? 0;
       laserWidthBonusPct += stats.laserWidthBonusPct ?? 0;
+      bounceCountBonus += stats.bounceCountBonus ?? 0;
     }
 
     // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
@@ -401,6 +409,7 @@ export class BuildSystem {
       critChance: critChanceBonusPct / 100,
       meleeDamageMultiplier: 1 + meleeDamageBonusPct / 100,
       laserWidthMultiplier: 1 + laserWidthBonusPct / 100,
+      bounceCountBonus,
     };
     this.onModifiersChanged?.(this.modifiers);
   }
