@@ -380,15 +380,15 @@ export class EnemySystem {
   }
 
   /**
-   * mod_laser用。x∈[minX,maxX] かつ y<maxY(自機より上方向)にいるアクティブな敵全員へ
-   * damageを与える(貫通ビームなので命中数に制限はない)。killEnemy(pool.release)を
+   * mod_laser用。x∈[minX,maxX] かつ y∈[minY,maxY](自機からビーム射程分だけ上方向)にいる
+   * アクティブな敵全員へdamageを与える(貫通ビームなので命中数に制限はない)。killEnemy(pool.release)を
    * 同じPoolのforEachActive走査中に呼べないため、対象を先に集めてから走査後にまとめて処理する。
    */
-  applyBeamDamage(minX: number, maxX: number, maxY: number, damage: number): void {
+  applyBeamDamage(minX: number, maxX: number, minY: number, maxY: number, damage: number): void {
     let hitCount = 0;
     this.pool.forEachActive((enemy, index) => {
       if (hitCount >= this.beamHitScratch.length) return;
-      if (enemy.x < minX || enemy.x > maxX || enemy.y > maxY) return;
+      if (enemy.x < minX || enemy.x > maxX || enemy.y > maxY || enemy.y < minY) return;
       this.beamHitScratch[hitCount] = index;
       hitCount += 1;
     });

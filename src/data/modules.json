@@ -1,10 +1,12 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5の12種すべてに効果を実装し収録済み(mod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_blade/mod_boomerang/mod_bouncer/mod_strike_a/mod_tesla/mod_mine/mod_drone)。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が完了したものだけを追加していく方針を最後まで貫いた。",
+  "_comment": "02_CORE_SPEC.md §7.5の12種すべてに効果を実装し収録済み(mod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_blade/mod_boomerang/mod_bouncer/mod_strike_a/mod_tesla/mod_mine/mod_drone)。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が完了したものだけを追加していく方針を最後まで貫いた。さらに§7.3の進化ルール(オーバーモジュール)を実装し、mod_drone以外の11種に evolvesTo/evolveRequiresChip とその進化先(mod_xxx_evo、末尾に+のついた強化版)を追加した。mod_droneの進化先チップchip_uplinkはオーバードライブゲージ系の未実装サブシステムに依存するため対象外とした(発生し得ない進化条件を仕込んでも無意味なため)。mod_xxx_evoはunlockAtPlayerLevelを9999にして通常の3択抽選プールには出現しないようにしてあり、BuildSystem.rollChoices()の進化確定枠経由でのみ出現する。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["single"],
+    "evolvesTo": "mod_spread_evo",
+    "evolveRequiresChip": "chip_barrel",
     "levels": [
       { "bulletCountBonus": 1, "spreadBonusDeg": 8 },
       { "bulletCountBonus": 2, "spreadBonusDeg": 16 },
@@ -16,6 +18,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["orbit"],
+    "evolvesTo": "mod_orbit_evo",
+    "evolveRequiresChip": "chip_gravity",
     "levels": [
       { "orbitCount": 1, "orbitBlockRadius": 18, "orbitRadius": 55, "orbitSpeedRad": 2.2 },
       { "orbitCount": 2, "orbitBlockRadius": 20, "orbitRadius": 60, "orbitSpeedRad": 2.4 },
@@ -27,6 +31,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 2,
     "tags": ["homing"],
+    "evolvesTo": "mod_homingflare_evo",
+    "evolveRequiresChip": "chip_seeker",
     "levels": [
       { "flareInterval": 1.2, "flareDamage": 8, "flareSpeed": 700, "flareTurnRateRad": 3.0 },
       { "flareInterval": 1.0, "flareDamage": 10, "flareSpeed": 700, "flareTurnRateRad": 3.4 },
@@ -38,6 +44,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["single"],
+    "evolvesTo": "mod_strike_s_evo",
+    "evolveRequiresChip": "chip_targeting",
     "levels": [
       { "strikeInterval": 2.5, "strikeDamage": 40 },
       { "strikeInterval": 2.2, "strikeDamage": 55 },
@@ -49,6 +57,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["single"],
+    "evolvesTo": "mod_laser_evo",
+    "evolveRequiresChip": "chip_lens",
     "levels": [
       { "laserHalfWidth": 35, "laserDamagePerSecond": 20 },
       { "laserHalfWidth": 42, "laserDamagePerSecond": 32 },
@@ -60,6 +70,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["melee"],
+    "evolvesTo": "mod_blade_evo",
+    "evolveRequiresChip": "chip_edge",
     "levels": [
       { "bladeInterval": 1.8, "bladeRadius": 90, "bladeDamage": 18 },
       { "bladeInterval": 1.5, "bladeRadius": 105, "bladeDamage": 24 },
@@ -71,6 +83,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["aoe"],
+    "evolvesTo": "mod_boomerang_evo",
+    "evolveRequiresChip": "chip_gyro",
     "levels": [
       { "boomerangInterval": 2.0, "boomerangDamage": 14, "boomerangSpeed": 900, "boomerangTurnSeconds": 0.35 },
       { "boomerangInterval": 1.7, "boomerangDamage": 18, "boomerangSpeed": 950, "boomerangTurnSeconds": 0.32 },
@@ -82,6 +96,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["single"],
+    "evolvesTo": "mod_bouncer_evo",
+    "evolveRequiresChip": "chip_elastic",
     "levels": [
       { "bouncerInterval": 1.6, "bouncerDamage": 16, "bouncerSpeed": 850, "bouncerMaxBounces": 2 },
       { "bouncerInterval": 1.3, "bouncerDamage": 20, "bouncerSpeed": 900, "bouncerMaxBounces": 3 },
@@ -93,6 +109,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["aoe"],
+    "evolvesTo": "mod_strike_a_evo",
+    "evolveRequiresChip": "chip_payload",
     "levels": [
       { "strikeAInterval": 2.2, "strikeARadius": 80, "strikeADamage": 22 },
       { "strikeAInterval": 1.8, "strikeARadius": 95, "strikeADamage": 30 },
@@ -104,6 +122,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["aoe"],
+    "evolvesTo": "mod_tesla_evo",
+    "evolveRequiresChip": "chip_capacitor",
     "levels": [
       { "teslaInterval": 1.0, "teslaDamage": 10, "teslaSearchRadius": 260 },
       { "teslaInterval": 0.8, "teslaDamage": 14, "teslaSearchRadius": 280 },
@@ -115,6 +135,8 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "tags": ["trap"],
+    "evolvesTo": "mod_mine_evo",
+    "evolveRequiresChip": "chip_hourglass",
     "levels": [
       { "mineInterval": 1.8, "mineRadius": 70, "mineDamage": 26, "mineDuration": 6 },
       { "mineInterval": 1.5, "mineRadius": 80, "mineDamage": 34, "mineDuration": 7 },
@@ -131,5 +153,82 @@
       { "droneInterval": 0.9, "droneDamage": 12, "droneSpeed": 700, "droneSearchRadius": 340 },
       { "droneInterval": 0.7, "droneDamage": 16, "droneSpeed": 750, "droneSearchRadius": 360 }
     ]
+  },
+  "mod_spread_evo": {
+    "name": "スプレッドバレル+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["single"],
+    "levels": [{ "bulletCountBonus": 5, "spreadBonusDeg": 34 }]
+  },
+  "mod_orbit_evo": {
+    "name": "オービットコア+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["orbit"],
+    "levels": [{ "orbitCount": 4, "orbitBlockRadius": 28, "orbitRadius": 70, "orbitSpeedRad": 3.0 }]
+  },
+  "mod_homingflare_evo": {
+    "name": "ホーミングフレア+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["homing"],
+    "levels": [{ "flareInterval": 0.55, "flareDamage": 18, "flareSpeed": 800, "flareTurnRateRad": 4.4 }]
+  },
+  "mod_strike_s_evo": {
+    "name": "ピンポイントストライク+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["single"],
+    "levels": [{ "strikeInterval": 1.3, "strikeDamage": 115 }]
+  },
+  "mod_laser_evo": {
+    "name": "ピアッシングレーザー+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["single"],
+    "levels": [{ "laserHalfWidth": 62, "laserDamagePerSecond": 72 }]
+  },
+  "mod_blade_evo": {
+    "name": "ウイングブレード+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["melee"],
+    "levels": [{ "bladeInterval": 0.85, "bladeRadius": 145, "bladeDamage": 48 }]
+  },
+  "mod_boomerang_evo": {
+    "name": "ブーメラン+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["aoe"],
+    "levels": [{ "boomerangInterval": 1.0, "boomerangDamage": 36, "boomerangSpeed": 1100, "boomerangTurnSeconds": 0.25 }]
+  },
+  "mod_bouncer_evo": {
+    "name": "バウンサー+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["single"],
+    "levels": [{ "bouncerInterval": 0.75, "bouncerDamage": 38, "bouncerSpeed": 1000, "bouncerMaxBounces": 6 }]
+  },
+  "mod_strike_a_evo": {
+    "name": "エリアストライク+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["aoe"],
+    "levels": [{ "strikeAInterval": 1.0, "strikeARadius": 130, "strikeADamage": 60 }]
+  },
+  "mod_tesla_evo": {
+    "name": "テスラタレット+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["aoe"],
+    "levels": [{ "teslaInterval": 0.4, "teslaDamage": 28, "teslaSearchRadius": 340 }]
+  },
+  "mod_mine_evo": {
+    "name": "ドリフトマイン+",
+    "maxLevel": 1,
+    "unlockAtPlayerLevel": 9999,
+    "tags": ["trap"],
+    "levels": [{ "mineInterval": 0.9, "mineRadius": 115, "mineDamage": 65, "mineDuration": 10 }]
   }
 }

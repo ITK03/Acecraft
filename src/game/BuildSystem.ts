@@ -3,10 +3,18 @@ import chipsData from '../data/chips.json';
 
 /**
  * ローグライト(モジュール/チップ)。02_CORE_SPEC.md §7。
- * Phase1着手分。§7.1のスロット数(モジュール4/チップ4)、§7.4の重み付き3択抽選を実装する。
- * §7.3の進化ルール([原作A] Lv3+チップ所持でオーバーモジュール確定枠)は、現状まだ進化先を
- * 持つモジュールを実装していないため未着手(Bullet.pierceと同様、将来のモジュール用に
- * データ構造だけ対応させてある。実装が増えたらここに抽選ロジックを追加する)。
+ * §7.1のスロット数(モジュール4/チップ4)、§7.4の重み付き3択抽選、§7.3の進化ルール
+ * (Lv3+必要チップ所持でオーバーモジュールが次の3択に確定で1枠出現)を実装する。
+ *
+ * 進化(オーバーモジュール)の実装方針: evolvesTo先の "mod_xxx_evo" は modules.json 側で
+ * ベースモジュールと全く同じフィールド名(bulletCountBonus等)を使った強化版レベルとして
+ * 1件だけ(maxLevel:1)定義する。こうすることで recomputeModifiers() のモジュール集計ループを
+ * 一切変更せずに(所持モジュールIDがベースからevoへ置き換わるだけで)効果が反映される。
+ * evo側は unlockAtPlayerLevel を意図的に非常に大きい値にして、通常の3択抽選プールには
+ * 絶対に出現しないようにしてある(rollChoices内の確定枠経由でのみ出現する)。
+ * mod_drone(進化先チップ chip_uplink)だけは、そのチップ自体が未実装のオーバードライブ
+ * ゲージ系サブシステムに依存し追加していないため、進化先も定義していない
+ * (発生し得ない進化条件を仕込むのは無意味なため)。
  */
 
 interface ModuleLevelStats {
@@ -56,6 +64,10 @@ interface ModuleDef {
   unlockAtPlayerLevel: number;
   tags: string[];
   levels: ModuleLevelStats[];
+  /** 02_CORE_SPEC.md §7.3進化ルール用。進化先モジュールID */
+  evolvesTo?: string;
+  /** 進化に必要なチップID(所持しているだけでよい。レベルは問わない) */
+  evolveRequiresChip?: string;
 }
 
 interface ChipLevelStats {
@@ -276,6 +288,25 @@ export class BuildSystem {
 
   /** レベルアップ時に3択を生成する。02_CORE_SPEC.md §7.4 重み付き抽選(重複なし) */
   rollChoices(playerLevel: number): PickChoice[] {
+    // 進化(02_CORE_SPEC.md §7.3): 所持モジュールがLv3(maxLevel)に達しており、進化先/必要チップが
+    // 定義されていて、かつそのチップを(レベル問わず)所持していれば、次の3択に「オーバーモジュール」を
+    // 確定で1枠出す。複数該当しても仕様通り確定枠は1つだけ(最初に見つかったものを採用)。
+    let guaranteedEvoId: string | null = null;
+    // 進化トリガーとなるチップをまだ所持していない場合、通常抽選での重みを引き上げて
+    // 進化を成立させやすくする(§7.4 重み表「進化トリガーになるチップを未所持→2.0」)。
+    const evoTriggerChipIds = new Set<string>();
+    for (const [id, level] of this.moduleLevels) {
+      const def = modules[id];
+      if (level < def.maxLevel || !def.evolvesTo || !def.evolveRequiresChip) continue;
+      if (this.chipLevels.has(def.evolveRequiresChip)) {
+        // 進化条件(Lv3 + チップ所持)を満たしている → 確定枠の対象。
+        if (guaranteedEvoId === null) guaranteedEvoId = def.evolvesTo;
+      } else {
+        // チップ未所持 → まだ進化できないので、そのチップを通常抽選で引きやすくする。
+        evoTriggerChipIds.add(def.evolveRequiresChip);
+      }
+    }
+
     const pool: Candidate[] = [];
     // JSONの _comment のような先頭アンダースコアのメタキーは実データではないため除外する。
     for (const id of Object.keys(modules).filter((k) => !k.startsWith('_'))) {
@@ -292,11 +323,13 @@ export class BuildSystem {
       const owned = this.chipLevels.get(id);
       if (owned !== undefined && owned >= def.maxLevel) continue;
       if (owned === undefined && this.chipLevels.size >= CHIP_SLOTS) continue;
-      pool.push({ kind: 'chip', id, weight: owned === undefined ? 1.2 : 0.9 });
+      const weight = evoTriggerChipIds.has(id) ? 2.0 : owned === undefined ? 1.2 : 0.9;
+      pool.push({ kind: 'chip', id, weight });
     }
 
     const picks: PickChoice[] = [];
-    for (let i = 0; i < 3 && pool.length > 0; i += 1) {
+    if (guaranteedEvoId) picks.push(this.describeChoice('module', guaranteedEvoId));
+    for (let i = picks.length; i < 3 && pool.length > 0; i += 1) {
       const totalWeight = pool.reduce((sum, c) => sum + c.weight, 0);
       let roll = Math.random() * totalWeight;
       let chosenIndex = pool.length - 1;
@@ -327,6 +360,15 @@ export class BuildSystem {
 
   applyChoice(choice: PickChoice): void {
     if (choice.kind === 'module') {
+      // 進化(§7.3): 選択したIDが所持中のいずれかのモジュールの進化先と一致する場合、
+      // 元のモジュールをスロットから外し進化後のIDに置き換える(スロットは消費しない)。
+      // 進化でない通常の新規/強化ピックでは該当する所持モジュールが無いため何もしない。
+      for (const [ownedId] of this.moduleLevels) {
+        if (modules[ownedId].evolvesTo === choice.id) {
+          this.moduleLevels.delete(ownedId);
+          break;
+        }
+      }
       this.moduleLevels.set(choice.id, choice.level);
     } else {
       this.chipLevels.set(choice.id, choice.level);
