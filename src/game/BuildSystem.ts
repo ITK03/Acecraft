@@ -35,6 +35,20 @@ interface ModuleLevelStats {
   bouncerDamage?: number;
   bouncerSpeed?: number;
   bouncerMaxBounces?: number;
+  strikeAInterval?: number;
+  strikeARadius?: number;
+  strikeADamage?: number;
+  teslaInterval?: number;
+  teslaDamage?: number;
+  teslaSearchRadius?: number;
+  mineInterval?: number;
+  mineRadius?: number;
+  mineDamage?: number;
+  mineDuration?: number;
+  droneInterval?: number;
+  droneDamage?: number;
+  droneSpeed?: number;
+  droneSearchRadius?: number;
 }
 interface ModuleDef {
   name: string;
@@ -57,6 +71,8 @@ interface ChipLevelStats {
   laserWidthBonusPct?: number;
   /** chip_elastic用。%ではなく固定加算(+1/2/3) */
   bounceCountBonus?: number;
+  areaRadiusBonusPct?: number;
+  trapDurationBonusPct?: number;
 }
 interface ChipDef {
   name: string;
@@ -121,6 +137,24 @@ export interface StatModifiers {
   bouncerDamage: number;
   bouncerSpeed: number;
   bouncerMaxBounces: number;
+  /** mod_strike_a(エリアストライク)。interval<=0で未所持扱い、AreaStrike側は何もしない */
+  strikeAInterval: number;
+  strikeARadius: number;
+  strikeADamage: number;
+  /** mod_tesla(テスラタレット)。interval<=0で未所持扱い、TeslaTurret側は何もしない */
+  teslaInterval: number;
+  teslaDamage: number;
+  teslaSearchRadius: number;
+  /** mod_mine(ドリフトマイン)。interval<=0で未所持扱い、MineField側は何もしない */
+  mineInterval: number;
+  mineRadius: number;
+  mineDamage: number;
+  mineDuration: number;
+  /** mod_drone(サポートドローン)。interval<=0で未所持扱い、Drone側は何もしない */
+  droneInterval: number;
+  droneDamage: number;
+  droneSpeed: number;
+  droneSearchRadius: number;
   /** chip_gravity: ドレイン範囲への乗数(1.0=無補正) */
   drainRadiusMultiplier: number;
   /** chip_seeker: カウンター弾/フレア弾の旋回速度への乗数(1.0=無補正) */
@@ -133,6 +167,10 @@ export interface StatModifiers {
   laserWidthMultiplier: number;
   /** chip_elastic: mod_bouncerの最大バウンス回数への固定加算(0=無補正) */
   bounceCountBonus: number;
+  /** chip_payload: mod_strike_aの半径への乗数(1.0=無補正) */
+  areaRadiusMultiplier: number;
+  /** chip_hourglass: mod_mineの持続時間への乗数(1.0=無補正) */
+  trapDurationMultiplier: number;
 }
 
 const BASE_MODIFIERS: StatModifiers = {
@@ -166,12 +204,28 @@ const BASE_MODIFIERS: StatModifiers = {
   bouncerDamage: 0,
   bouncerSpeed: 0,
   bouncerMaxBounces: 0,
+  strikeAInterval: 0,
+  strikeARadius: 0,
+  strikeADamage: 0,
+  teslaInterval: 0,
+  teslaDamage: 0,
+  teslaSearchRadius: 0,
+  mineInterval: 0,
+  mineRadius: 0,
+  mineDamage: 0,
+  mineDuration: 0,
+  droneInterval: 0,
+  droneDamage: 0,
+  droneSpeed: 0,
+  droneSearchRadius: 0,
   drainRadiusMultiplier: 1,
   homingTurnRateMultiplier: 1,
   critChance: 0,
   meleeDamageMultiplier: 1,
   laserWidthMultiplier: 1,
   bounceCountBonus: 0,
+  areaRadiusMultiplier: 1,
+  trapDurationMultiplier: 1,
 };
 
 interface Candidate {
@@ -192,6 +246,8 @@ function describeChipLevel(stats: ChipLevelStats): string {
   if (stats.meleeDamageBonusPct !== undefined) return `近接ダメージ +${stats.meleeDamageBonusPct}%`;
   if (stats.laserWidthBonusPct !== undefined) return `レーザー幅 +${stats.laserWidthBonusPct}%`;
   if (stats.bounceCountBonus !== undefined) return `跳ね返り回数 +${stats.bounceCountBonus}`;
+  if (stats.areaRadiusBonusPct !== undefined) return `範囲攻撃の半径 +${stats.areaRadiusBonusPct}%`;
+  if (stats.trapDurationBonusPct !== undefined) return `設置物の持続時間 +${stats.trapDurationBonusPct}%`;
   return '';
 }
 
@@ -203,6 +259,10 @@ function describeModuleLevel(stats: ModuleLevelStats): string {
   if (stats.bladeInterval !== undefined) return `${stats.bladeInterval}秒ごとに至近の敵を薙ぐ(威力${stats.bladeDamage})`;
   if (stats.boomerangInterval !== undefined) return `${stats.boomerangInterval}秒ごとにブーメラン弾(威力${stats.boomerangDamage})`;
   if (stats.bouncerInterval !== undefined) return `${stats.bouncerInterval}秒ごとに跳ね返る弾(威力${stats.bouncerDamage})`;
+  if (stats.strikeAInterval !== undefined) return `${stats.strikeAInterval}秒ごとにランダム地点へ範囲爆撃(威力${stats.strikeADamage})`;
+  if (stats.teslaInterval !== undefined) return `${stats.teslaInterval}秒ごとに周囲の敵へ雷撃(威力${stats.teslaDamage})`;
+  if (stats.mineInterval !== undefined) return `${stats.mineInterval}秒ごとに機雷を設置。接触で爆発(威力${stats.mineDamage})`;
+  if (stats.droneInterval !== undefined) return `自律行動するドローンが${stats.droneInterval}秒ごとに射撃(威力${stats.droneDamage})`;
   return `弾数+${stats.bulletCountBonus} 拡散角+${stats.spreadBonusDeg}°`;
 }
 
@@ -286,6 +346,8 @@ export class BuildSystem {
     let meleeDamageBonusPct = 0;
     let laserWidthBonusPct = 0;
     let bounceCountBonus = 0;
+    let areaRadiusBonusPct = 0;
+    let trapDurationBonusPct = 0;
     for (const [id, level] of this.chipLevels) {
       const stats = chips[id].levels[level - 1];
       atkBonusPct += stats.atkBonusPct ?? 0;
@@ -299,6 +361,8 @@ export class BuildSystem {
       meleeDamageBonusPct += stats.meleeDamageBonusPct ?? 0;
       laserWidthBonusPct += stats.laserWidthBonusPct ?? 0;
       bounceCountBonus += stats.bounceCountBonus ?? 0;
+      areaRadiusBonusPct += stats.areaRadiusBonusPct ?? 0;
+      trapDurationBonusPct += stats.trapDurationBonusPct ?? 0;
     }
 
     // 各モジュールは1スロットにつき1種類しか所持できないため、bulletCountBonus等はモジュール間で
@@ -329,6 +393,20 @@ export class BuildSystem {
     let bouncerDamage = 0;
     let bouncerSpeed = 0;
     let bouncerMaxBounces = 0;
+    let strikeAInterval = 0;
+    let strikeARadius = 0;
+    let strikeADamage = 0;
+    let teslaInterval = 0;
+    let teslaDamage = 0;
+    let teslaSearchRadius = 0;
+    let mineInterval = 0;
+    let mineRadius = 0;
+    let mineDamage = 0;
+    let mineDuration = 0;
+    let droneInterval = 0;
+    let droneDamage = 0;
+    let droneSpeed = 0;
+    let droneSearchRadius = 0;
     for (const [id, level] of this.moduleLevels) {
       const stats = modules[id].levels[level - 1];
       bulletCountBonus += stats.bulletCountBonus ?? 0;
@@ -370,6 +448,28 @@ export class BuildSystem {
         bouncerSpeed = stats.bouncerSpeed ?? 0;
         bouncerMaxBounces = stats.bouncerMaxBounces ?? 0;
       }
+      if (stats.strikeAInterval !== undefined) {
+        strikeAInterval = stats.strikeAInterval;
+        strikeARadius = stats.strikeARadius ?? 0;
+        strikeADamage = stats.strikeADamage ?? 0;
+      }
+      if (stats.teslaInterval !== undefined) {
+        teslaInterval = stats.teslaInterval;
+        teslaDamage = stats.teslaDamage ?? 0;
+        teslaSearchRadius = stats.teslaSearchRadius ?? 0;
+      }
+      if (stats.mineInterval !== undefined) {
+        mineInterval = stats.mineInterval;
+        mineRadius = stats.mineRadius ?? 0;
+        mineDamage = stats.mineDamage ?? 0;
+        mineDuration = stats.mineDuration ?? 0;
+      }
+      if (stats.droneInterval !== undefined) {
+        droneInterval = stats.droneInterval;
+        droneDamage = stats.droneDamage ?? 0;
+        droneSpeed = stats.droneSpeed ?? 0;
+        droneSearchRadius = stats.droneSearchRadius ?? 0;
+      }
     }
 
     this.modifiers = {
@@ -404,12 +504,28 @@ export class BuildSystem {
       bouncerDamage,
       bouncerSpeed,
       bouncerMaxBounces,
+      strikeAInterval,
+      strikeARadius,
+      strikeADamage,
+      teslaInterval,
+      teslaDamage,
+      teslaSearchRadius,
+      mineInterval,
+      mineRadius,
+      mineDamage,
+      mineDuration,
+      droneInterval,
+      droneDamage,
+      droneSpeed,
+      droneSearchRadius,
       drainRadiusMultiplier: 1 + drainRadiusBonusPct / 100,
       homingTurnRateMultiplier: 1 + homingTurnRateBonusPct / 100,
       critChance: critChanceBonusPct / 100,
       meleeDamageMultiplier: 1 + meleeDamageBonusPct / 100,
       laserWidthMultiplier: 1 + laserWidthBonusPct / 100,
       bounceCountBonus,
+      areaRadiusMultiplier: 1 + areaRadiusBonusPct / 100,
+      trapDurationMultiplier: 1 + trapDurationBonusPct / 100,
     };
     this.onModifiersChanged?.(this.modifiers);
   }

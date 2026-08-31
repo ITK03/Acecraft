@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.5は12種のモジュールを列挙しているが、Phase1着手分として実際に効果を実装済みのmod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_blade/mod_boomerang/mod_bouncerのみここに収録している。残り4種(mod_tesla等)は独自の弾パターン/サブシステムが必要な中〜大規模タスクのため、仕様書にデータ定義はあるが未実装。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が追いついたものだけをここに追加していく方針。",
+  "_comment": "02_CORE_SPEC.md §7.5の12種すべてに効果を実装し収録済み(mod_spread/mod_orbit/mod_homingflare/mod_strike_s/mod_laser/mod_blade/mod_boomerang/mod_bouncer/mod_strike_a/mod_tesla/mod_mine/mod_drone)。中身のないダミーを抽選対象に含めると『選んでも何も起きない』壊れた体験になるため、実装が完了したものだけを追加していく方針を最後まで貫いた。",
   "mod_spread": {
     "name": "スプレッドバレル",
     "maxLevel": 3,
@@ -86,6 +86,50 @@
       { "bouncerInterval": 1.6, "bouncerDamage": 16, "bouncerSpeed": 850, "bouncerMaxBounces": 2 },
       { "bouncerInterval": 1.3, "bouncerDamage": 20, "bouncerSpeed": 900, "bouncerMaxBounces": 3 },
       { "bouncerInterval": 1.0, "bouncerDamage": 26, "bouncerSpeed": 950, "bouncerMaxBounces": 4 }
+    ]
+  },
+  "mod_strike_a": {
+    "name": "エリアストライク",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["aoe"],
+    "levels": [
+      { "strikeAInterval": 2.2, "strikeARadius": 80, "strikeADamage": 22 },
+      { "strikeAInterval": 1.8, "strikeARadius": 95, "strikeADamage": 30 },
+      { "strikeAInterval": 1.4, "strikeARadius": 110, "strikeADamage": 40 }
+    ]
+  },
+  "mod_tesla": {
+    "name": "テスラタレット",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["aoe"],
+    "levels": [
+      { "teslaInterval": 1.0, "teslaDamage": 10, "teslaSearchRadius": 260 },
+      { "teslaInterval": 0.8, "teslaDamage": 14, "teslaSearchRadius": 280 },
+      { "teslaInterval": 0.6, "teslaDamage": 19, "teslaSearchRadius": 300 }
+    ]
+  },
+  "mod_mine": {
+    "name": "ドリフトマイン",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "tags": ["trap"],
+    "levels": [
+      { "mineInterval": 1.8, "mineRadius": 70, "mineDamage": 26, "mineDuration": 6 },
+      { "mineInterval": 1.5, "mineRadius": 80, "mineDamage": 34, "mineDuration": 7 },
+      { "mineInterval": 1.2, "mineRadius": 95, "mineDamage": 44, "mineDuration": 8 }
+    ]
+  },
+  "mod_drone": {
+    "name": "サポートドローン",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 2,
+    "tags": ["homing"],
+    "levels": [
+      { "droneInterval": 1.1, "droneDamage": 9, "droneSpeed": 650, "droneSearchRadius": 320 },
+      { "droneInterval": 0.9, "droneDamage": 12, "droneSpeed": 700, "droneSearchRadius": 340 },
+      { "droneInterval": 0.7, "droneDamage": 16, "droneSpeed": 750, "droneSearchRadius": 360 }
     ]
   }
 }

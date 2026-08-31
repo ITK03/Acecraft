@@ -29,6 +29,10 @@ import { LaserBeam } from './game/LaserBeam';
 import { WingBlade } from './game/WingBlade';
 import { Boomerang } from './game/Boomerang';
 import { Bouncer } from './game/Bouncer';
+import { AreaStrike } from './game/AreaStrike';
+import { TeslaTurret } from './game/TeslaTurret';
+import { MineField } from './game/MineField';
+import { Drone } from './game/Drone';
 import balance from './data/balance.json';
 import stage1_1 from './data/stages/1-1.json';
 
@@ -142,6 +146,14 @@ async function bootstrap(): Promise<void> {
   const boomerang = new Boomerang();
   // Phase 1: mod_bouncer(バウンサー)。未所持(interval<=0)の間は発射しない。
   const bouncer = new Bouncer();
+  // Phase 1: mod_strike_a(エリアストライク)。未所持(interval<=0)の間は発動しない。
+  const areaStrike = new AreaStrike();
+  // Phase 1: mod_tesla(テスラタレット)。未所持(interval<=0)の間は描画も判定もしない。
+  const teslaTurret = new TeslaTurret();
+  // Phase 1: mod_mine(ドリフトマイン)。未所持(interval<=0)の間は新規設置しない。
+  const mineField = new MineField();
+  // Phase 1: mod_drone(サポートドローン)。未所持(interval<=0)の間は描画も射撃もしない。
+  const drone = new Drone();
 
   // T4: ドレイン(吸収)フィールド。02_CORE_SPEC.md §3 参照。
   const drainField = new DrainField(
@@ -225,6 +237,38 @@ async function bootstrap(): Promise<void> {
       damage: modifiers.bouncerDamage,
       speed: modifiers.bouncerSpeed,
       maxBounces: modifiers.bouncerMaxBounces + modifiers.bounceCountBonus,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    // chip_payload: 範囲(radius)への乗数。
+    areaStrike.applyLoadout({
+      interval: modifiers.strikeAInterval,
+      radius: modifiers.strikeARadius * modifiers.areaRadiusMultiplier,
+      damage: modifiers.strikeADamage,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    teslaTurret.applyLoadout({
+      interval: modifiers.teslaInterval,
+      damage: modifiers.teslaDamage,
+      searchRadius: modifiers.teslaSearchRadius,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    // chip_hourglass: 持続時間(duration)への乗数。
+    mineField.applyLoadout({
+      interval: modifiers.mineInterval,
+      radius: modifiers.mineRadius,
+      damage: modifiers.mineDamage,
+      duration: modifiers.mineDuration * modifiers.trapDurationMultiplier,
+      critChance: modifiers.critChance,
+      critDamageMultiplier: balance.player.critDamageMultiplier,
+    });
+    drone.applyLoadout({
+      interval: modifiers.droneInterval,
+      damage: modifiers.droneDamage,
+      speed: modifiers.droneSpeed,
+      searchRadius: modifiers.droneSearchRadius,
       critChance: modifiers.critChance,
       critDamageMultiplier: balance.player.critDamageMultiplier,
     });
@@ -329,6 +373,10 @@ async function bootstrap(): Promise<void> {
   world.addChild(pinpointStrike.view);
   world.addChild(laserBeam.view);
   world.addChild(wingBlade.view);
+  world.addChild(areaStrike.view);
+  world.addChild(teslaTurret.view);
+  world.addChild(mineField.view);
+  world.addChild(drone.view);
   world.addChild(screenFlash);
   world.addChild(waveHud);
   world.addChild(bossHud);
@@ -429,6 +477,10 @@ async function bootstrap(): Promise<void> {
       pinpointStrike.update(dt, craft.state, enemySystem);
       laserBeam.update(dt, craft.state, craft.x, craft.y, enemySystem, bulletSystem);
       wingBlade.update(dt, craft.state, craft.x, craft.y, enemySystem);
+      areaStrike.update(dt, craft.state, enemySystem);
+      teslaTurret.update(dt, craft.state, craft.x, craft.y, enemySystem);
+      mineField.update(dt, craft.state, craft.x, craft.y, enemySystem);
+      drone.update(dt, craft.state, craft.x, craft.y, bulletSystem, enemySystem);
 
       // COUNTER中は02_CORE_SPEC.md §3.4により0.35秒間無敵。以前はここが未実装で、
       // ヒットストップ(0.06秒)を過ぎた残りのCOUNTER時間は普通に被弾していた不具合を修正した。

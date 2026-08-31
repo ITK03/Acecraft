@@ -1,5 +1,5 @@
 {
-  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙しているが、Phase1着手分として既存システムへの倍率適用だけで完結する(新規サブシステム不要な)11種のみここに収録している。chip_edge/chip_lens/chip_elasticはそれぞれmod_blade/mod_laser/mod_bouncerの実装完了に伴い追加した。残り3種は対応するモジュール(mod_mine等)が未実装のため未収録。",
+  "_comment": "02_CORE_SPEC.md §7.6は14種のチップを列挙している。chip_uplinkを除く13種をここに収録している。chip_uplink(アップリンク)は『オーバードライブゲージ獲得量+%』という、このコードベースにまだ存在しないオーバードライブゲージ系サブシステムに依存しており、実装すると新しいゲームメカニクス自体を発明することになるため対象外とした(該当ゲージシステムが実装されない限り、効果が空振りする壊れたチップになってしまう)。",
   "chip_barrel": {
     "name": "バレル拡張",
     "maxLevel": 3,
@@ -65,5 +65,17 @@
     "maxLevel": 3,
     "unlockAtPlayerLevel": 1,
     "levels": [{ "bounceCountBonus": 1 }, { "bounceCountBonus": 2 }, { "bounceCountBonus": 3 }]
+  },
+  "chip_payload": {
+    "name": "ペイロード",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "levels": [{ "areaRadiusBonusPct": 15 }, { "areaRadiusBonusPct": 30 }, { "areaRadiusBonusPct": 50 }]
+  },
+  "chip_hourglass": {
+    "name": "アワーグラス",
+    "maxLevel": 3,
+    "unlockAtPlayerLevel": 1,
+    "levels": [{ "trapDurationBonusPct": 30 }, { "trapDurationBonusPct": 60 }, { "trapDurationBonusPct": 100 }]
   }
 }
